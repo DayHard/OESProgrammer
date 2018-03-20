@@ -1,0 +1,18 @@
+﻿<Window x:Class="OESProgrammer.CapProgrammingWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="Cap Programming" Height="200" Width="320" ResizeMode="NoResize" Closing="Window_Closing">
+    <Grid Margin="10,0,10,10">
+        <Label Content="Датчик положения крышки (Открыто):" HorizontalAlignment="Left" Margin="0,10,0,0" VerticalAlignment="Top"/>
+        <Label Content="Датчик положения крышки (Закрыто):" HorizontalAlignment="Left" Margin="2,33,0,0" VerticalAlignment="Top"/>
+        <TextBox HorizontalAlignment="Left" Height="20" Margin="223,10,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="60"/>
+        <TextBox HorizontalAlignment="Left" Height="20" Margin="223,38,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="60"/>
+        <GroupBox Header="Статус операции" HorizontalAlignment="Left" Height="55" Margin="0,66,0,0" VerticalAlignment="Top" Width="284">
+            <ProgressBar HorizontalAlignment="Left" Height="20" Margin="0,5,0,0" VerticalAlignment="Top" Width="270"/>
+        </GroupBox>
+        <Button Content="Прошить" HorizontalAlignment="Left" Margin="100,126,0,0" VerticalAlignment="Top" Width="80" Height="25"/>
+    </Grid>
+</Window>
