@@ -1,4 +1,5 @@
 ﻿using System;
+using System.ComponentModel;
 using System.Net;
 using System.Net.Sockets;
 using System.Windows;
@@ -11,9 +12,9 @@ namespace OESProgrammer
     /// </summary>
     public partial class VpdProgrammingWindow
     {
-        private readonly UdpClient _sender;
-        private readonly UdpClient _resiver;
-        private readonly IPEndPoint _endPoint;
+        private UdpClient _sender;
+        private UdpClient _resiver;
+        private IPEndPoint _endPoint;
         private const int TimeOut = 100;
         private const int LocalPort = 40100;
         private readonly byte[] _doNotClose = { 10, 0, 0, 0, 0, 0, 0, 0 };
@@ -26,7 +27,12 @@ namespace OESProgrammer
             _remoteIp = remoteIp;
             // Инициализация компонентов формы
             InitializeComponent();
+            // Подпись на событие изменение видимости формы
+            IsVisibleChanged += VpdProgrammingWindow_IsVisibleChanged;
 
+        }
+        private void VpdProgrammingWindow_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
+        {
             _sender = new UdpClient();
             _resiver = new UdpClient(LocalPort) { Client = { ReceiveTimeout = TimeOut, DontFragment = false } };
             _endPoint = new IPEndPoint(IPAddress.Parse(_remoteIp), RemotePort);
@@ -35,6 +41,20 @@ namespace OESProgrammer
             DoNotCloseConnectionTimer.Tick += DoNotCloseConnectionTimer_Tick;
             // Запуск таймера
             DoNotCloseConnectionTimer.Start();
+
+            IsVisibleChanged -= VpdProgrammingWindow_IsVisibleChanged;
+        }
+        private void Window_Closing(object sender, CancelEventArgs e)
+        {
+            // Закрываем текущие соединения
+            DoNotCloseConnectionTimer.Stop();
+            _sender.Close();
+            _resiver.Close();
+            // Отменяем закрытие формы
+            e.Cancel = true;
+            Hide();
+            // Отпись от события изменение видимости формы
+            IsVisibleChanged += VpdProgrammingWindow_IsVisibleChanged;
         }
         private void DoNotCloseConnectionTimer_Tick(object sender, EventArgs e)
         {
@@ -46,12 +66,6 @@ namespace OESProgrammer
             {
                 MessageBox.Show(this, "Невозможно отправить команду перехвата управления в STM: " + ex.Message, "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
             }
-        }
-
-        private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
-        {
-                e.Cancel = true;
-                Hide();
         }
 
         private void BtnProgrammVpd_Click(object sender, RoutedEventArgs e)

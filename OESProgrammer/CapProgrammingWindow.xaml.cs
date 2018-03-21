@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Threading;
 
@@ -13,24 +14,36 @@ namespace OESProgrammer
     /// </summary>
     public partial class CapProgrammingWindow
     {
-        private readonly UdpClient _sender;
-        private readonly UdpClient _resiver;
-        private readonly IPEndPoint _endPoint;
+        #region Variables
+
         private readonly byte[] _doNotClose = { 10, 0, 0, 0, 0, 0, 0, 0 };
         private static readonly DispatcherTimer DoNotCloseConnectionTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        private UdpClient _sender;
+        private UdpClient _resiver;
+        private IPEndPoint _endPoint;
         private const int TimeOut = 100;
         private const int LocalPort = 40100;
-
         private const int RemotePort = 40101;
         private static string _remoteIp;
+
+        #endregion
+
+        #region SupportMethods
+
         public CapProgrammingWindow(string remoteIp)
         {
             // IP адресc STM
             _remoteIp = remoteIp;
             // Инициализация компонентов формы
             InitializeComponent();
-
-            _sender = new UdpClient();
+            // Подпись на событие изменение видимости формы
+            IsVisibleChanged += CapProgrammingWindow_IsVisibleChanged;
+        }
+        // Обработчик события изменения видимости формы
+        // Выделение ресурсов перед отображением окна
+        private void CapProgrammingWindow_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
+        {
+            _sender = new UdpClient{Client = {SendTimeout = 100}};
             _resiver = new UdpClient(LocalPort) { Client = { ReceiveTimeout = TimeOut, DontFragment = false } };
             _endPoint = new IPEndPoint(IPAddress.Parse(_remoteIp), RemotePort);
 
@@ -38,11 +51,20 @@ namespace OESProgrammer
             DoNotCloseConnectionTimer.Tick += DoNotCloseConnectionTimer_Tick;
             // Запуск таймера
             DoNotCloseConnectionTimer.Start();
+            // Отпись от события изменения видимости формы
+            IsVisibleChanged -= CapProgrammingWindow_IsVisibleChanged;
         }
-        private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
+        // Освобождение ресурсов перед сворачиваем окна
+        private void Window_Closing(object sender, CancelEventArgs e)
         {
+            DoNotCloseConnectionTimer.Stop();
+            _sender.Close();
+            _resiver.Close();
+
             e.Cancel = true;
             Hide();
+            // Подпись на событие изменение видимости формы
+            IsVisibleChanged += CapProgrammingWindow_IsVisibleChanged;
         }
         // Команда по таймеру не закрывать соединение  
         private void DoNotCloseConnectionTimer_Tick(object sender, EventArgs e)
@@ -51,9 +73,10 @@ namespace OESProgrammer
             {
                 _sender.Send(_doNotClose, _doNotClose.Length, _endPoint);
             }
-            catch (Exception ex)
+            catch (SocketException)
             {
-                MessageBox.Show(this, "Невозможно отправить команду перехвата управления в STM: " + ex.Message, "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show(this, "Невозможно отправить команду перехвата управления в STM. Удаленное устройство недоступно. ", "Ошибка", MessageBoxButton.OK, 
+                    MessageBoxImage.Error);
             }
         }
         /// <summary>
@@ -73,71 +96,93 @@ namespace OESProgrammer
             return arr.Select((t, i) => t << i * 8).Sum();
         }
         /// <summary>
-        /// Преобразование к порядку байтов Big Endian
+        /// Установка значения статуса операции Успех
         /// </summary>
-        /// <param name="data">Массив</param>
-        /// <param name="poss">Положение 1 байта числа</param>
-        /// <param name="size">Размер числа в байтах</param>
-        /// <returns></returns>
-        private static int ToBigEndian(byte[] data, int poss, int size)
+        private void SetStatusSuccess()
         {
-            var arr = new byte[size];
-            for (int i = 0; i < arr.Length; i++)
-            {
-                arr[i] = data[poss + i];
-            }
-            int result = 0;
-            for (int i = 0; i < arr.Length; i++)
-            {
-                result |= arr[i] << 8 * (size - 1 - i);
-            }
-            return result;
+            LabStatusOperation.Content = "Успех.";
         }
+        /// <summary>
+        /// Установка значения статуса операции Ошибка
+        /// </summary>
+        private void SetStatusFail()
+        {
+            LabStatusOperation.Content = "Ошибка.";
+        }
+        #endregion
+
         private void BtnCheckCap_Click(object sender, RoutedEventArgs e)
         {
             CheckCapStatus();
         }
-
+        // Запрос состоянии крышек ОЭД
         private async void CheckCapStatus()
         {
             var getCapStatus = new byte[8];
             getCapStatus[0] = 12;
             getCapStatus[2] = 7;
 
-            try
+            await Task.Run(() =>
             {
-                // Запрос на получения статуса крышеки
-                await _sender.SendAsync(getCapStatus, getCapStatus.Length, _endPoint);
-                // Ожидание ответа статуса крышек 
-                var receivedData = await _resiver.ReceiveAsync();
-                var data = new byte[receivedData.Buffer.Length - 8];
-
-                Array.Copy(receivedData.Buffer, 8, data, 0, data.Length);
-
-                if (data.Length != 64 || receivedData.Buffer[2] == 0xff)
+                try
                 {
-                    MessageBox.Show(this, "Произошла ошибка при получении статуса крышек", "Ошибка", MessageBoxButton.OK,
-                        MessageBoxImage.Error);
-                    return;
+                    // Запрос на получения статуса крышеки
+                    _sender.Send(getCapStatus, getCapStatus.Length, _endPoint);
                 }
+                catch (SocketException)
+                {
+                    Dispatcher.Invoke(() =>
+                    {
+                        MessageBox.Show(this, "Невозможно отправить запрос. Stm не доступна. ", "Ошибка",
+                            MessageBoxButton.OK, MessageBoxImage.Error);
+                        SetStatusFail();
+                    });
+                }
+            });
 
-                TbCapSensorOpen.Text = ToLittleEndian(data, 1, 2).ToString();
-                TbCapSensorClose.Text = ToLittleEndian(data, 3, 2).ToString();
-            }
-            catch (SocketException)
+            await Task.Run(() =>
             {
-                MessageBox.Show(this, "STM не вернул запрошенный статус", "Ошибка", MessageBoxButton.OK,
-                    MessageBoxImage.Error);
-            }
-            MessageBox.Show(this, "Данные получены", "Информация", MessageBoxButton.OK,
-                MessageBoxImage.Information);
-        }
+                try
+                {
+                    // Ожидание ответа статуса крышек 
+                    var recData = _resiver.Receive(ref _endPoint);
+                    var data = new byte[recData.Length - 8];
 
+                    Array.Copy(recData, 8, data, 0, data.Length);
+
+                    if (data.Length != 64 || recData[2] == 0xff)
+                    {
+                        Dispatcher.Invoke(() =>
+                        {
+                            MessageBox.Show(this, "Произошла ошибка при получении статуса крышек", "Ошибка",
+                                MessageBoxButton.OK,
+                                MessageBoxImage.Error);
+                            SetStatusFail();
+                        });
+                        return;
+                    }
+
+                    TbCapSensorOpen.Text = ToLittleEndian(data, 1, 2).ToString();
+                    TbCapSensorClose.Text = ToLittleEndian(data, 3, 2).ToString();
+                }
+                catch (SocketException)
+                {
+                    Dispatcher.Invoke(() =>
+                    {
+                        MessageBox.Show(this, "Stm не ответила на запрос. ", "Ошибка", MessageBoxButton.OK,
+                            MessageBoxImage.Error);
+                        SetStatusFail();
+                    });
+                }
+            });
+
+            SetStatusSuccess();
+        }
         private void BtnProgrammCap_Click(object sender, RoutedEventArgs e)
         {
            ProgrammCap();
         }
-
+        // Команда перепрошивки крышек ОЭД
         private async void ProgrammCap()
         {
             if (MessageBox.Show(this, "Вы уверены что хотите перепрошить крышку?", "Внимание", MessageBoxButton.YesNo,MessageBoxImage.Question) == MessageBoxResult.No)
@@ -155,9 +200,21 @@ namespace OESProgrammer
             short.TryParse(TbCapSensorClose.Text, out closeValue);
 
             // Проверяем введенное значение крышка открыта на валидность
-            if (openValue < 0 || openValue > 4096) return;
+            if (openValue < 0 || openValue > 4096)
+            {
+                MessageBox.Show(this, "Значение датчика положения крышки (Открыто) недопустимо. Введите значение от 0 до 4096.", "Ошибка",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+                SetStatusFail();
+                return;
+            }
             // Проверяем введенное значение крышка закрыта на валидность
-            if (closeValue < 0 || closeValue > 4096) return;
+            if (closeValue < 0 || closeValue > 4096)
+            {
+                MessageBox.Show(this, "Значение датчика положения крышки (Закрыто) недопустимо. Введите значение от 0 до 4096.", "Ошибка",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+                SetStatusFail();
+                return;
+            }
 
             var openValueBytes = BitConverter.GetBytes(openValue);
             comProgCap[9] = openValueBytes[0];
@@ -167,7 +224,49 @@ namespace OESProgrammer
             comProgCap[11] = closeValueBytes[0];
             comProgCap[12] = closeValueBytes[1];
 
-            await _sender.SendAsync(comProgCap, comProgCap.Length, _endPoint);
+            await Task.Run(() =>
+            {
+                try
+                {
+                    _sender.Send(comProgCap, comProgCap.Length, _endPoint);
+                }
+                catch (SocketException)
+                {
+                    Dispatcher.Invoke(() =>
+                    {
+                        MessageBox.Show(this, "Невозможно отправить запрос. Stm не доступна. ", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                        SetStatusFail();
+                    });
+                }
+            });
+
+            await Task.Run(() =>
+            {
+                try
+                {
+                    var rec = _resiver.Receive(ref _endPoint);
+
+                    if (rec[0] != 0xc || rec[2] != 0x06)
+                    {
+                        Dispatcher.Invoke(() =>
+                        {
+                            MessageBox.Show(this, "Произошла ошибка, в процессе прошивки крышки", "Ошибка",
+                                MessageBoxButton.OK, MessageBoxImage.Error);
+                            SetStatusFail();
+                        });
+                    }
+
+                }
+                catch (SocketException)
+                {
+                    Dispatcher.Invoke(() =>
+                    {
+                        MessageBox.Show(this, "Stm не отвечает.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                        SetStatusFail();
+                    });
+                }
+            });
+
             // Проверяем статус прошивки
             CheckCapStatus();
         }

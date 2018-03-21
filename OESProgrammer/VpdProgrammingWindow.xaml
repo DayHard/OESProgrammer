@@ -17,13 +17,13 @@
         <Label Content="Координата Y канала 2, пиксель:" HorizontalAlignment="Left" Margin="16,108,0,0" VerticalAlignment="Top"/>
         <Label Content="Фокус канала 1, мм:" HorizontalAlignment="Left" Margin="86,134,0,0" VerticalAlignment="Top"/>
         <Label Content="Фокус канала 2, мм:" HorizontalAlignment="Left" Margin="86,160,0,0" VerticalAlignment="Top"/>
-        <TextBox HorizontalAlignment="Left" Height="20" Margin="210,10,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="70"/>
-        <TextBox HorizontalAlignment="Left" Height="20" Margin="210,35,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="70"/>
-        <TextBox HorizontalAlignment="Left" Height="20" Margin="210,60,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="70"/>
-        <TextBox HorizontalAlignment="Left" Height="20" Margin="210,87,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="70"/>
-        <TextBox HorizontalAlignment="Left" Height="20" Margin="210,112,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="70"/>
-        <TextBox HorizontalAlignment="Left" Height="20" Margin="210,140,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="70"/>
-        <TextBox HorizontalAlignment="Left" Height="20" Margin="210,165,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="70"/>
+        <TextBox HorizontalAlignment="Left" Height="20" Margin="210,10,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="70" Text="0"/>
+        <TextBox HorizontalAlignment="Left" Height="20" Margin="210,35,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="70" Text="0"/>
+        <TextBox HorizontalAlignment="Left" Height="20" Margin="210,60,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="70" Text="0"/>
+        <TextBox HorizontalAlignment="Left" Height="20" Margin="210,87,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="70" Text="0"/>
+        <TextBox HorizontalAlignment="Left" Height="20" Margin="210,112,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="70" Text="0"/>
+        <TextBox HorizontalAlignment="Left" Height="20" Margin="210,140,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="70" Text="0"/>
+        <TextBox HorizontalAlignment="Left" Height="20" Margin="210,165,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="70" Text="0"/>
 
     </Grid>
 </Window>
