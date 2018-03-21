@@ -4,7 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
-        Title="OESProgrammer" Height="175" Width="290" Closing="Window_Closing" Loaded="Window_Loaded" ResizeMode="NoResize">
+        Title="OESProgrammer" Height="175" Width="290" Closing="Window_Closing" Loaded="Window_Loaded" ResizeMode="NoResize" WindowStartupLocation="Manual" Icon="Resources/BiohazardGreen.ico">
     <Grid HorizontalAlignment="Left" Width="272">
         <Button x:Name="BtnProgrammingVpd" Content="Программирование&#xD;&#xA;       платы ВПУ" HorizontalAlignment="Left" Margin="10,40,0,0" VerticalAlignment="Top" Width="120" Height="65" Click="BtnProgrammingVpd_Click"/>
         <Button x:Name="BtnProgrammingCap" Content="Программирование&#xD;&#xA;         крышки" HorizontalAlignment="Left" Margin="145,40,0,10" VerticalAlignment="Top" Width="120" Height="65" Click="BtnProgrammingCap_Click" />

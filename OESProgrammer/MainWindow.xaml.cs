@@ -136,7 +136,7 @@ namespace OESProgrammer
             if (_capWindow == null)
             {
                 _capWindow = new CapProgrammingWindow(_remoteIp) {Owner = this};
-                _capWindow.Show();
+                _capWindow.ShowDialog();
             }
             else _capWindow.ShowDialog();
         }

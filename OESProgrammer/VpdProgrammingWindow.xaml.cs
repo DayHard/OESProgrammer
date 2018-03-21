@@ -53,5 +53,11 @@ namespace OESProgrammer
                 e.Cancel = true;
                 Hide();
         }
+
+        private void BtnProgrammVpd_Click(object sender, RoutedEventArgs e)
+        {
+            if (MessageBox.Show(this, "Вы уверены что хотите перепрошить ВПУ?", "Внимание", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.No)
+                return;
+        }
     }
 }

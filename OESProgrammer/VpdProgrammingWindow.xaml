@@ -4,12 +4,12 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
-        Title="VPD Programming" Height="320" Width="325" Closing="Window_Closing" ResizeMode="NoResize">
+        Title="VPD Programming" Height="320" Width="325" Closing="Window_Closing" ResizeMode="NoResize" Icon="Resources/BiohazardGreen.ico">
     <Grid Margin="10,0,10,0">
         <GroupBox Header="Статус операции" HorizontalAlignment="Left" Height="57" Margin="0,191,0,0" VerticalAlignment="Top" Width="289" AutomationProperties.Name="Значение">
             <ProgressBar Height="20" Margin="0,0,0,0" VerticalAlignment="Center" Width="275" HorizontalAlignment="Center"/>
         </GroupBox>
-        <Button Content="Прошить" HorizontalAlignment="Left" Margin="104,253,0,0" VerticalAlignment="Top" Width="75"/>
+        <Button x:Name="BtnProgrammVpd" Content="Прошить" HorizontalAlignment="Left" Margin="104,253,0,0" VerticalAlignment="Top" Width="75" Click="BtnProgrammVpd_Click"/>
         <Label Content="Номер прибора:" HorizontalAlignment="Left" Margin="104,4,0,0" VerticalAlignment="Top"/>
         <Label Content="Координата X канала 1, пиксель:" HorizontalAlignment="Left" Margin="16,30,0,0" VerticalAlignment="Top"/>
         <Label Content="Координата Y канала 1, пиксель:" HorizontalAlignment="Left" Margin="16,56,0,0" VerticalAlignment="Top"/>
