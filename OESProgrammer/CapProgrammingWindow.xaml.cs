@@ -125,25 +125,9 @@ namespace OESProgrammer
             await Task.Run(() =>
             {
                 try
-                {
+                {               
                     // Запрос на получения статуса крышеки
                     _sender.Send(getCapStatus, getCapStatus.Length, _endPoint);
-                }
-                catch (SocketException)
-                {
-                    Dispatcher.Invoke(() =>
-                    {
-                        MessageBox.Show(this, "Невозможно отправить запрос. Stm не доступна. ", "Ошибка",
-                            MessageBoxButton.OK, MessageBoxImage.Error);
-                        SetStatusFail();
-                    });
-                }
-            });
-
-            await Task.Run(() =>
-            {
-                try
-                {
                     // Ожидание ответа статуса крышек 
                     var recData = _resiver.Receive(ref _endPoint);
                     var data = new byte[recData.Length - 8];
@@ -154,7 +138,7 @@ namespace OESProgrammer
                     {
                         Dispatcher.Invoke(() =>
                         {
-                            MessageBox.Show(this, "Произошла ошибка при получении статуса крышек", "Ошибка",
+                            MessageBox.Show(this, "Произошла ошибка при получении статуса крышек из ОЭД.", "Ошибка",
                                 MessageBoxButton.OK,
                                 MessageBoxImage.Error);
                             SetStatusFail();
@@ -173,10 +157,11 @@ namespace OESProgrammer
                             MessageBoxImage.Error);
                         SetStatusFail();
                     });
+                    return;
                 }
+                SetStatusSuccess();
             });
 
-            SetStatusSuccess();
         }
         private void BtnProgrammCap_Click(object sender, RoutedEventArgs e)
         {
@@ -224,26 +209,13 @@ namespace OESProgrammer
             comProgCap[11] = closeValueBytes[0];
             comProgCap[12] = closeValueBytes[1];
 
+            bool isNotSuccess = false;
             await Task.Run(() =>
             {
                 try
                 {
                     _sender.Send(comProgCap, comProgCap.Length, _endPoint);
-                }
-                catch (SocketException)
-                {
-                    Dispatcher.Invoke(() =>
-                    {
-                        MessageBox.Show(this, "Невозможно отправить запрос. Stm не доступна. ", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
-                        SetStatusFail();
-                    });
-                }
-            });
 
-            await Task.Run(() =>
-            {
-                try
-                {
                     var rec = _resiver.Receive(ref _endPoint);
 
                     if (rec[0] != 0xc || rec[2] != 0x06)
@@ -253,9 +225,9 @@ namespace OESProgrammer
                             MessageBox.Show(this, "Произошла ошибка, в процессе прошивки крышки", "Ошибка",
                                 MessageBoxButton.OK, MessageBoxImage.Error);
                             SetStatusFail();
+                            isNotSuccess = true;
                         });
                     }
-
                 }
                 catch (SocketException)
                 {
@@ -263,10 +235,12 @@ namespace OESProgrammer
                     {
                         MessageBox.Show(this, "Stm не отвечает.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
                         SetStatusFail();
+                        isNotSuccess = true;
                     });
                 }
             });
 
+            if (!isNotSuccess)
             // Проверяем статус прошивки
             CheckCapStatus();
         }
