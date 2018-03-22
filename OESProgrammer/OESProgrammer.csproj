@@ -111,6 +111,10 @@
       <Generator>SettingsSingleFileGenerator</Generator>
       <LastGenOutput>Settings.Designer.cs</LastGenOutput>
     </None>
+    <None Include="Resources\7315.01.22.100_DD6_DD9_V1.bex" />
+    <None Include="Resources\7315.01.22.100_DD6_DD9_V2.bex" />
+    <None Include="Resources\7315.01.22.200_DD6_DD9_V3.bex" />
+    <None Include="Resources\7315.01.22.200_DD6_DD9_V4.bex" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />

@@ -72,6 +72,10 @@ namespace OESProgrammer
         {
             if (MessageBox.Show(this, "Вы уверены что хотите перепрошить ВПУ?", "Внимание", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.No)
                 return;
+
+            const string fwName = "_7315_01_22_100_DD6_DD9_V1";
+            var firmware = Properties.Resources.ResourceManager.GetObject(fwName);
+            
         }
     }
 }
