@@ -23,6 +23,9 @@ namespace OESProgrammer
         private const int RemotePort = 40101;
         private static readonly DispatcherTimer DoNotCloseConnectionTimer = new DispatcherTimer {Interval = TimeSpan.FromSeconds(1)};
         private static string _remoteIp;
+
+        #region SupportMethods
+
         public VpdProgrammingWindow(string remoteIp)
         {
             // IP адресc STM
@@ -69,7 +72,28 @@ namespace OESProgrammer
                 MessageBox.Show(this, "Невозможно отправить команду перехвата управления в STM: " + ex.Message, "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
+        private static int ToLittleEndian(byte[] data, int poss, int size)
+        {
+            var arr = new byte[size];
+            for (int i = 0; i < arr.Length; i++)
+            {
+                arr[i] = data[poss + i];
+            }
+            return arr.Select((t, i) => t << i * 8).Sum();
+        }
 
+        #endregion
+
+        // Считывание текущей версии прошивки
+        private void BtnGetFirmwareVersion_Click(object sender, RoutedEventArgs e)
+        {
+            GetFirmwareFromOed();
+        }
+
+        private void GetFirmwareFromOed()
+        {
+            
+        }
         private void BtnProgrammVpd_Click(object sender, RoutedEventArgs e)
         {
             if (!BoxesIsValid())
@@ -81,12 +105,10 @@ namespace OESProgrammer
             CountFirmwareControlSum(firmware, firmware.Length - 2);
             CountFirmwareControlSum(firmware, firmware.Length);
 
-            using (var bin = new BinaryWriter(File.OpenWrite("343_new.bex")))
-            {
-                bin.Write(firmware);
-            }
+            // Сохраняем прошику перед записьшу в ВПУ
+            SaveFinishedFirmware(firmware);
 
-            if (!SendFirmWare(firmware)) return;
+            //if (!SendFirmWare(firmware)) return;
 
         }
         // Загружаем данные, введенные пользователем и проверяем их на валидность
@@ -94,7 +116,7 @@ namespace OESProgrammer
         {
             ushort deviceNumber;
             ushort.TryParse(TbDeviceNumber.Text, out deviceNumber);
-            if (deviceNumber < 41 || deviceNumber > 65535)
+            if (deviceNumber < 42 || deviceNumber > 65535)
             {
                 MessageBox.Show(this, "Номер прибора может быть от 42 до 65535", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
                 return false;
@@ -275,10 +297,6 @@ namespace OESProgrammer
 
             for (int i = 2; i < length; i += 2)
             {
-                if (i == 262_138)
-                {
-                    
-                }
                 crc += (uint)(firmware[i] << 8);
                 crc += firmware[i + 1];
                 for (int j = 0; j < 16; j++)
@@ -297,6 +315,71 @@ namespace OESProgrammer
             firmware[length - 2] = csbytes[1];
             firmware[length - 1] = csbytes[0];
         }
+        /// <summary>
+        /// Сохранения файла прошивки на жестком диске
+        /// </summary>
+        /// <param name="firmware">Массив прошивки</param>
+        private static void SaveFinishedFirmware(byte[] firmware)
+        {
+            var version = FwConfig.FirmwareVersion + 1;
+            using (var bin = new BinaryWriter(File.OpenWrite("Номер прибора " + FwConfig.Device + " Версия прошивки " + version + ".bex")))
+            {
+                bin.Write(firmware);
+            }
+        }
+        private static bool SendFirmWare(byte[] firmware)
+        {
+            try
+            {
+                //var commandStm = new byte[72];
+                //commandStm[0] = 0x0c;
+                //commandStm[2] = 0x08;
+
+                //var commandOed = new byte[6];
+                //var dataOed = new byte[6];
+
+                //int counter = 0;
+                //int adress = 0;
+
+                //while (counter < firmware.Length)
+                //{
+
+                //    commandOed[0] = 
+                //    int j = 0;
+                //    for (int i = counter; i < counter + 58; i++)
+                //    {
+                //        dataOed[j] = firmware[i];           
+                //        j++;
+                //    }
+                //    counter += j;
+                //}
+
+                //_sender.Send(comProgCap, comProgCap.Length, _endPoint);
+
+                //var rec = _resiver.Receive(ref _endPoint);
+
+                //if (rec[0] != 0xc || rec[2] != 0x06)
+                //{
+                //    Dispatcher.Invoke(() =>
+                //    {
+                //        MessageBox.Show(this, "Произошла ошибка, в процессе прошивки крышки", "Ошибка",
+                //            MessageBoxButton.OK, MessageBoxImage.Error);
+                //        SetStatusFail();
+                //        isNotSuccess = true;
+                //    });
+                //}
+            }
+            catch (SocketException)
+            {
+                //Dispatcher.Invoke(() =>
+                //{
+                //    MessageBox.Show(this, "Stm не отвечает.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                //    SetStatusFail();
+                //    isNotSuccess = true;
+                //});
+            }
+            return false;
+        }
 
         /// <summary>
         /// Преобразование к порядку байтов Little Endian
@@ -305,19 +388,7 @@ namespace OESProgrammer
         /// <param name="poss">Положение 1 байта числа</param>
         /// <param name="size">Размер числа в байтах</param>
         /// <returns></returns>
-        private static int ToLittleEndian(byte[] data, int poss, int size)
-    {
-        var arr = new byte[size];
-        for (int i = 0; i < arr.Length; i++)
-        {
-            arr[i] = data[poss + i];
-        }
-        return arr.Select((t, i) => t << i * 8).Sum();
-    }
-        private static bool SendFirmWare(byte[] firmware)
-        {
-            return false;
-        }
+
     }
     // Хранятся значения полей, введенных пользователем
     public static class FwConfig
