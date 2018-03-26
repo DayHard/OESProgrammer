@@ -1,5 +1,7 @@
 ﻿using System;
 using System.ComponentModel;
+using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Windows;
@@ -73,115 +75,24 @@ namespace OESProgrammer
             if (!BoxesIsValid())
                 return;
 
-            if(!PrepareFirmware())
-                return;
+            var firmware = PrepareFirmware();
+            if (firmware == null) return;
+
+            CountFirmwareControlSum(firmware, firmware.Length - 2);
+            CountFirmwareControlSum(firmware, firmware.Length);
+
+            using (var bin = new BinaryWriter(File.OpenWrite("343_new.bex")))
+            {
+                bin.Write(firmware);
+            }
+
+            if (!SendFirmWare(firmware)) return;
 
         }
-
-        private static bool PrepareFirmware()
-        {
-            string fwName = string.Empty;
-            switch (FwConfig.FirmwareVersion)
-            {
-                case 0:
-                    fwName = "_7315_01_22_100_DD6_DD9_V1";
-                    break;
-                case 1:
-                    fwName = "_7315_01_22_100_DD6_DD9_V2";
-                    break;
-                case 2:
-                    fwName = "_7315_01_22_200_DD6_DD9_V3";
-                    break;
-                case 3:
-                    fwName = "_7315_01_22_200_DD6_DD9_V4";
-                    break;
-            }
-
-            object obj = Properties.Resources.ResourceManager.GetObject(fwName);
-
-            byte[] firmware = (byte[])obj;
-
-            if (firmware == null) return false;
-
-            // Флаг начала структуры
-            firmware[262080] = 0xAA;
-            firmware[262081] = 0x55;
-
-            // Номер прибора
-            var dev = BitConverter.GetBytes(FwConfig.Device);
-            firmware[262082] = dev[1];
-            firmware[262083] = dev[0];
-
-            // Координата Х канал 1 (*16 [почему никто не помнит, для все координат])
-            var x1 = BitConverter.GetBytes(FwConfig.CoordXChannel1 * 16);
-            firmware[262084] = x1[1];
-            firmware[262085] = x1[0];
-
-            // Координата Х канал 1 (*16 [почему никто не помнит, для все координат])
-            var y1 = BitConverter.GetBytes(FwConfig.CoordYChannel1 * 16);
-            firmware[262086] = y1[1];
-            firmware[262087] = y1[0];
-
-            // Координата Х канал 2 (*16 [почему никто не помнит, для все координат])
-            var x2 = BitConverter.GetBytes(FwConfig.CoordXChannel2 * 16);
-            firmware[262088] = x2[1];
-            firmware[262089] = x2[0];
-
-            // Координата Y канал 2 (*16 [почему никто не помнит, для все координат])
-            var y2 = BitConverter.GetBytes(FwConfig.CoordYChannel2 * 16);
-            firmware[262090] = y2[1];
-            firmware[262091] = y2[0];
-
-            // Фокус 1 канала (*10 [почему никто не помнит, для всех фокусов])
-            var f1 = BitConverter.GetBytes((ushort)(FwConfig.FokusChannel1 * 10));
-            firmware[262092] = f1[1];
-            firmware[262093] = f1[0];
-
-            // Фокус 2 канала (*10 [почему никто не помнит, для всех])
-            var f2 = BitConverter.GetBytes((ushort)(FwConfig.FokusChannel2 * 10));
-            firmware[262094] = f2[1];
-            firmware[262095] = f2[0];
-
-            // Зануляем байты согласно структуре
-            firmware[262096] = firmware[262097] = firmware[262104] = firmware[262105] = 0;
-
-            CountControlsSum(firmware);
-
-            return true;
-        }
-
-        private static void CountControlsSum(byte[] firmware)
-        {
-            int checksumstruct = 0;
-            for (int i = 262080; i < 262097; i += 2)
-            {
-                checksumstruct ^= firmware[i] << 8 | firmware[i + 1];
-            }
-            var cs = BitConverter.GetBytes((ushort)checksumstruct);
-            firmware[262098] = cs[1];
-            firmware[262099] = cs[0];
-
-            int checksum = 0;
-            for (int i = 0; i < firmware.Length - 4; i += 2)
-            {
-                checksum ^= firmware[i] << 8 | firmware[i + 1];
-            }
-
-            var cs2 = BitConverter.GetBytes((ushort)checksum);
-            firmware[262140] = cs2[1];
-            firmware[262141] = cs2[0];
-
-            int globcs = 0;
-            for (int i = 0; i < firmware.Length - 2; i++)
-            {
-                globcs ^= firmware[i] << 8 | firmware[i + 1];
-            }
-        }
-
         // Загружаем данные, введенные пользователем и проверяем их на валидность
         private bool BoxesIsValid()
         {
-            ushort  deviceNumber;
+            ushort deviceNumber;
             ushort.TryParse(TbDeviceNumber.Text, out deviceNumber);
             if (deviceNumber < 41 || deviceNumber > 65535)
             {
@@ -228,7 +139,7 @@ namespace OESProgrammer
 
             double focusChannel1;
             double.TryParse(TbFocusChannel1.Text, out focusChannel1);
-            if (focusChannel1 < 49 || focusChannel1 >55)
+            if (focusChannel1 < 49 || focusChannel1 > 55)
             {
                 MessageBox.Show(this, "Фокус канала 1 может принимать значения от 49 до 55, с шагов 0,1", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
                 return false;
@@ -255,9 +166,157 @@ namespace OESProgrammer
             // Запрос у пользователя, на согласие прошить ВПУ
             if (MessageBox.Show(this, "Вы уверены что хотите перепрошить ВПУ?", "Внимание", MessageBoxButton.YesNo,
                     MessageBoxImage.Question) == MessageBoxResult.No)
-                return false;        
+                return false;
 
             return true;
+        }
+        // Занесение данных формы в файл прошивки.
+        private static byte[] PrepareFirmware()
+        {
+            string fwName = string.Empty;
+            switch (FwConfig.FirmwareVersion)
+            {
+                case 0:
+                    fwName = "_7315_01_22_100_DD6_DD9_V1";
+                    break;
+                case 1:
+                    fwName = "_7315_01_22_100_DD6_DD9_V2";
+                    break;
+                case 2:
+                    fwName = "_7315_01_22_200_DD6_DD9_V3";
+                    break;
+                case 3:
+                    fwName = "_7315_01_22_200_DD6_DD9_V4";
+                    break;
+            }
+
+            object obj = Properties.Resources.ResourceManager.GetObject(fwName);
+
+            byte[] firmware = (byte[])obj;
+
+            if (firmware == null) return null;
+
+            // Флаг начала структуры
+            firmware[262080] = 0xAA;
+            firmware[262081] = 0x55;
+
+            // Номер прибора
+            var dev = BitConverter.GetBytes(FwConfig.Device);
+            firmware[262082] = dev[1];
+            firmware[262083] = dev[0];
+
+            // Координата Х канал 1 (*16 [почему - никто не помнит, для все координат])
+            var x1 = BitConverter.GetBytes(FwConfig.CoordXChannel1 * 16);
+            firmware[262084] = x1[1];
+            firmware[262085] = x1[0];
+
+            // Координата Х канал 1 (*16 [почему - никто не помнит, для все координат])
+            var y1 = BitConverter.GetBytes(FwConfig.CoordYChannel1 * 16);
+            firmware[262086] = y1[1];
+            firmware[262087] = y1[0];
+
+            // Координата Х канал 2 (*16 [почему - никто не помнит, для все координат])
+            var x2 = BitConverter.GetBytes(FwConfig.CoordXChannel2 * 16);
+            firmware[262088] = x2[1];
+            firmware[262089] = x2[0];
+
+            // Координата Y канал 2 (*16 [почему - никто не помнит, для все координат])
+            var y2 = BitConverter.GetBytes(FwConfig.CoordYChannel2 * 16);
+            firmware[262090] = y2[1];
+            firmware[262091] = y2[0];
+
+            // Фокус 1 канала (*10 [почему - никто не помнит, для всех фокусов])
+            var f1 = BitConverter.GetBytes((ushort)(FwConfig.FokusChannel1 * 10));
+            firmware[262092] = f1[1];
+            firmware[262093] = f1[0];
+
+            // Фокус 2 канала (*10 [почему - никто не помнит, для всех])
+            var f2 = BitConverter.GetBytes((ushort)(FwConfig.FokusChannel2 * 10));
+            firmware[262094] = f2[1];
+            firmware[262095] = f2[0];
+
+            // Зануляем байты согласно структуре (резервные байты)
+            firmware[262096] = firmware[262097] = firmware[262104] = firmware[262105] = 0;
+
+            CountStructControlsSum(firmware);
+
+            return firmware;
+        }
+        // Расчет контрольной суммы структуры и занесение их в прошивку.
+        private static void CountStructControlsSum(byte[] firmware)
+        {
+            int checksumstruct = 0;
+            for (int i = 262080; i < 262097; i += 2)
+            {
+                checksumstruct ^= firmware[i] << 8 | firmware[i + 1];
+            }
+
+            var cs = BitConverter.GetBytes((ushort)checksumstruct);
+            firmware[262098] = cs[1];
+            firmware[262099] = cs[0];
+
+            int checksum = 0;
+            for (int i = 0; i < firmware.Length - 4; i += 2)
+            {
+                checksum ^= firmware[i] << 8 | firmware[i + 1];
+            }
+        }
+        // Расчет контрольной суммы файла прошивки
+        private static void CountFirmwareControlSum(byte[] firmware, int length)
+        {
+            // Портировано из исходников прошлой программы.
+            uint crc = 0;
+            const uint polynom = 0x80050000;
+            firmware[length - 1] = 0;
+            firmware[length - 2] = 0;
+
+            crc += (uint)firmware[0] << 24;
+            crc += (uint)firmware[1] << 16;
+
+            for (int i = 2; i < length; i += 2)
+            {
+                if (i == 262_138)
+                {
+                    
+                }
+                crc += (uint)(firmware[i] << 8);
+                crc += firmware[i + 1];
+                for (int j = 0; j < 16; j++)
+                {
+                    if ((crc & 0x80000000) == 0x80000000)
+                    {
+                        crc <<= 1;
+                        crc ^= polynom;
+                    }
+                    else crc <<= 1;
+                }
+            }
+
+            var cscorrected = crc >> 16;
+            var csbytes = BitConverter.GetBytes(cscorrected);
+            firmware[length - 2] = csbytes[1];
+            firmware[length - 1] = csbytes[0];
+        }
+
+        /// <summary>
+        /// Преобразование к порядку байтов Little Endian
+        /// </summary>
+        /// <param name="data">Массив</param>
+        /// <param name="poss">Положение 1 байта числа</param>
+        /// <param name="size">Размер числа в байтах</param>
+        /// <returns></returns>
+        private static int ToLittleEndian(byte[] data, int poss, int size)
+    {
+        var arr = new byte[size];
+        for (int i = 0; i < arr.Length; i++)
+        {
+            arr[i] = data[poss + i];
+        }
+        return arr.Select((t, i) => t << i * 8).Sum();
+    }
+        private static bool SendFirmWare(byte[] firmware)
+        {
+            return false;
         }
     }
     // Хранятся значения полей, введенных пользователем
