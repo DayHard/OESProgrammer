@@ -1,9 +1,12 @@
 ﻿using System;
 using System.ComponentModel;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Threading.Tasks;
 using System.Net.Sockets;
+using System.Threading;
 using System.Windows;
 using System.Windows.Threading;
 
@@ -15,12 +18,13 @@ namespace OESProgrammer
     public partial class VpdProgrammingWindow
     {
         private UdpClient _sender;
-        private UdpClient _resiver;
-        private IPEndPoint _endPoint;
+        private UdpClient _receiver;
+        private IPEndPoint _sendEndPoint;
+        private IPEndPoint _receiveEndPoint;
         private const int TimeOut = 100;
         private const int LocalPort = 40100;
-        private readonly byte[] _doNotClose = { 10, 0, 0, 0, 0, 0, 0, 0 };
         private const int RemotePort = 40101;
+        private readonly byte[] _doNotClose = { 10, 0, 0, 0, 0, 0, 0, 0 };
         private static readonly DispatcherTimer DoNotCloseConnectionTimer = new DispatcherTimer {Interval = TimeSpan.FromSeconds(1)};
         private static string _remoteIp;
 
@@ -39,8 +43,8 @@ namespace OESProgrammer
         private void VpdProgrammingWindow_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
             _sender = new UdpClient();
-            _resiver = new UdpClient(LocalPort) { Client = { ReceiveTimeout = TimeOut, DontFragment = false } };
-            _endPoint = new IPEndPoint(IPAddress.Parse(_remoteIp), RemotePort);
+            _receiver = new UdpClient(LocalPort) { Client = { ReceiveTimeout = TimeOut, DontFragment = false } };
+            _sendEndPoint = new IPEndPoint(IPAddress.Parse(_remoteIp), RemotePort);
 
             // Подпись на событие, поддержания связи с STM
             DoNotCloseConnectionTimer.Tick += DoNotCloseConnectionTimer_Tick;
@@ -54,7 +58,7 @@ namespace OESProgrammer
             // Закрываем текущие соединения
             DoNotCloseConnectionTimer.Stop();
             _sender.Close();
-            _resiver.Close();
+            _receiver.Close();
             // Отменяем закрытие формы
             e.Cancel = true;
             Hide();
@@ -65,7 +69,7 @@ namespace OESProgrammer
         {
             try
             {
-                _sender.Send(_doNotClose, _doNotClose.Length, _endPoint);
+                _sender.Send(_doNotClose, _doNotClose.Length, _sendEndPoint);
             }
             catch (Exception ex)
             {
@@ -84,26 +88,142 @@ namespace OESProgrammer
 
         #endregion
 
-        // Считывание текущей версии прошивки
         private void BtnGetFirmwareVersion_Click(object sender, RoutedEventArgs e)
         {
-            GetFirmwareFromOed();
+            GetFirmwareVersion();
         }
 
-        private void GetFirmwareFromOed()
+        private async void GetFirmwareVersion()
         {
-            
+            await Task.Run(() =>
+            {
+                var fw = GetFirmwareFromOed();
+
+                var cstrcs = CountStructControlsSum(fw);
+                var rstrcs = ReadStructCheckSum(fw);
+                if (cstrcs != rstrcs) throw new Exception("Ошибка проверки контрольный сум структуры.");
+
+                var cfwcs = CountFirmwareControlSum(fw, fw.Length);
+                if (cfwcs != 0) throw new Exception("Контрольная сумма файла прошивки не совпадает.");
+
+                DecodeFirmwareSettings(fw);
+                SetFirmwareSettings();
+            });
+        }
+
+        /// <summary>
+        /// Считывание текущей версии прошивки из ВПУ
+        /// </summary>
+        /// <returns>Файл прошивки</returns>
+        private byte[] GetFirmwareFromOed()
+        {
+            #region Varibles
+
+            // Команда подготовки прошивки
+            var comLoadFwtoMem = new byte[8];
+            comLoadFwtoMem[0] = 0x0c;
+            comLoadFwtoMem[2] = 0x0b;
+            // Команда дай мне 2048 байт
+            var comGetMe2048 = new byte[8];
+            comGetMe2048[0] = 0x0c;
+            comGetMe2048[2] = 0x03;
+
+            const int fwsize = 262144;
+            int counter = 0;
+            var firmware = new byte[fwsize];
+            PbOperationStatus.Maximum = fwsize;
+            #endregion
+
+            // Запрос на подготовку прошивки
+            _sender.Send(comLoadFwtoMem, comLoadFwtoMem.Length, _sendEndPoint);
+            Thread.Sleep(1000);
+
+            while (counter < fwsize)
+            {                         
+                // Запрос на подготовку прошивки
+                _sender.Send(comGetMe2048, comGetMe2048.Length, _sendEndPoint);
+                for (int i = 0; i < 2; i++)
+                {                       
+                    // Запрос на получение блока данных (2048)
+                    var resivedData = _receiver.Receive(ref _receiveEndPoint);
+
+                    if (firmware.Length - counter >= 1024)
+                    {
+                        Array.Copy(resivedData, 8, firmware, counter, resivedData.Length - 8);
+                        counter += resivedData.Length - 8;
+                    }
+                    else
+                    {
+                        Array.Copy(resivedData, 8, firmware, counter, firmware.Length - counter);
+                        counter += firmware.Length - counter;
+                    }
+                    // Изменяем значение прогресс бара
+                    var counter1 = counter;
+                    Dispatcher.Invoke(() =>
+                    {
+                        PbOperationStatus.Value = counter1;
+                    });
+                }
+            }
+            // После скачивания зануляем статусбар
+            PbOperationStatus.Value = 0;
+            return firmware;
+        }
+        /// <summary>
+        /// Декодирование пользовательских параметров из файла прошивки
+        /// </summary>
+        /// <param name="firmware">Файл прошивки</param>
+        private void DecodeFirmwareSettings(byte[] firmware)
+        {
+            // Номер прибора
+            FwConfig.Device = (ushort)ToLittleEndian(firmware, 262082, 2);
+
+            // Координата Х канал 1 (*16 [почему - никто не помнит, для все координат])
+            FwConfig.CoordXChannel1 = (byte)(ToLittleEndian(firmware, 262084, 2) / 16);
+
+            // Координата Х канал 1 (*16 [почему - никто не помнит, для все координат])
+            FwConfig.CoordYChannel1 = (byte)(ToLittleEndian(firmware, 262086, 2) / 16);
+
+            // Координата Х канал 2 (*16 [почему - никто не помнит, для все координат])
+            FwConfig.CoordXChannel2 = (byte)(ToLittleEndian(firmware, 262088, 2) / 16);
+
+            // Координата Y канал 2 (*16 [почему - никто не помнит, для все координат])
+            FwConfig.CoordYChannel1 = (byte)(ToLittleEndian(firmware, 262090, 2) / 16);
+
+            // Фокус 1 канала (*10 [почему - никто не помнит, для всех фокусов])
+            FwConfig.FokusChannel1 = (double)ToLittleEndian(firmware, 262092, 2) / 10;
+
+            // Фокус 2 канала (*10 [почему - никто не помнит, для всех])
+            FwConfig.FokusChannel2 = (double)ToLittleEndian(firmware, 262094, 2) / 10;
+
+        }
+        /// <summary>
+        /// Установка полей пользовательского интерфейс в соответсвии с данными прошивки
+        /// </summary>
+        private void SetFirmwareSettings()
+        {
+            TbDeviceNumber.Text = FwConfig.Device.ToString();
+            TbCoordXChannel1.Text = FwConfig.CoordXChannel1.ToString();
+            TbCoordYChannel1.Text = FwConfig.CoordYChannel1.ToString();
+            TbCoordXChannel2.Text = FwConfig.CoordXChannel2.ToString();
+            TbCoordYChannel2.Text = FwConfig.CoordYChannel2.ToString();
+            TbFocusChannel1.Text = FwConfig.FokusChannel1.ToString(CultureInfo.InvariantCulture);
+            TbFocusChannel2.Text = FwConfig.FokusChannel2.ToString(CultureInfo.InvariantCulture);
         }
         private void BtnProgrammVpd_Click(object sender, RoutedEventArgs e)
         {
-            if (!BoxesIsValid())
+            if (!GetFirmwareSettings())
                 return;
 
             var firmware = PrepareFirmware();
-            if (firmware == null) return;
+            if (firmware == null) throw new Exception("В ходе подготовки прошивки произошла ошибка.");
 
-            CountFirmwareControlSum(firmware, firmware.Length - 2);
-            CountFirmwareControlSum(firmware, firmware.Length);
+            var cs = CountFirmwareControlSum(firmware, firmware.Length - 2);
+            WriteFirmwareCheckSum(firmware, firmware.Length - 2, cs);
+
+            var zerocs = CountFirmwareControlSum(firmware, firmware.Length);
+            if (zerocs != 0) throw new Exception("Посчитанная контрольная сумма не равно 0.");
+            WriteFirmwareCheckSum(firmware, firmware.Length, zerocs);
 
             // Сохраняем прошику перед записьшу в ВПУ
             SaveFinishedFirmware(firmware);
@@ -111,8 +231,11 @@ namespace OESProgrammer
             //if (!SendFirmWare(firmware)) return;
 
         }
-        // Загружаем данные, введенные пользователем и проверяем их на валидность
-        private bool BoxesIsValid()
+        /// <summary>
+        /// Считывание параметров, введенных пользователем, а также проверка на валидность.
+        /// </summary>
+        /// <returns>Успешно ли выполнение</returns>
+        private bool GetFirmwareSettings()
         {
             ushort deviceNumber;
             ushort.TryParse(TbDeviceNumber.Text, out deviceNumber);
@@ -192,7 +315,10 @@ namespace OESProgrammer
 
             return true;
         }
-        // Занесение данных формы в файл прошивки.
+        /// <summary>
+        /// Занесение пользовательских параметров в файл прошивки
+        /// </summary>
+        /// <returns>Файл прошивки с параметрами</returns>
         private static byte[] PrepareFirmware()
         {
             string fwName = string.Empty;
@@ -260,31 +386,52 @@ namespace OESProgrammer
             // Зануляем байты согласно структуре (резервные байты)
             firmware[262096] = firmware[262097] = firmware[262104] = firmware[262105] = 0;
 
-            CountStructControlsSum(firmware);
+            var checksumstruct = CountStructControlsSum(firmware);
+            WriteStructControlSum(firmware, checksumstruct);
 
             return firmware;
         }
-        // Расчет контрольной суммы структуры и занесение их в прошивку.
-        private static void CountStructControlsSum(byte[] firmware)
+        /// <summary>
+        /// Расчет контрольной суммы структуры с пользовательскими параметрами
+        /// </summary>
+        /// <param name="firmware">Файл прошивки</param>
+        /// <returns>Контрольную сумму</returns>
+        private static int CountStructControlsSum(byte[] firmware)
         {
             int checksumstruct = 0;
             for (int i = 262080; i < 262097; i += 2)
             {
                 checksumstruct ^= firmware[i] << 8 | firmware[i + 1];
             }
-
+            return checksumstruct;
+        }
+        /// <summary>
+        /// Запись контрольной суммы структуры с пользовательскими параметрами в файл прошивки
+        /// </summary>
+        /// <param name="firmware">Файл прошивки</param>
+        /// <param name="checksumstruct">Контрольная сумма структуры</param>
+        private static void WriteStructControlSum(byte[] firmware, int checksumstruct)
+        {
             var cs = BitConverter.GetBytes((ushort)checksumstruct);
             firmware[262098] = cs[1];
             firmware[262099] = cs[0];
-
-            int checksum = 0;
-            for (int i = 0; i < firmware.Length - 4; i += 2)
-            {
-                checksum ^= firmware[i] << 8 | firmware[i + 1];
-            }
         }
-        // Расчет контрольной суммы файла прошивки
-        private static void CountFirmwareControlSum(byte[] firmware, int length)
+        /// <summary>
+        /// Считывание контрольной суммы структуры пользовательскиз параметров из файла прошивки
+        /// </summary>
+        /// <param name="fw">Файл прошивки</param>
+        /// <returns>Контрольную сумму</returns>
+        private static int ReadStructCheckSum(byte[] fw)
+        {
+            return ToLittleEndian(fw, 262098, 2);
+        }
+        /// <summary>
+        /// Расчет контрольной суммы файла прошивки
+        /// </summary>
+        /// <param name="firmware">Файл прошивки</param>
+        /// <param name="length">Длинна масива</param>
+        /// <returns>Контрольную сумму</returns>
+        private static uint CountFirmwareControlSum(byte[] firmware, int length)
         {
             // Портировано из исходников прошлой программы.
             uint crc = 0;
@@ -309,9 +456,17 @@ namespace OESProgrammer
                     else crc <<= 1;
                 }
             }
-
-            var cscorrected = crc >> 16;
-            var csbytes = BitConverter.GetBytes(cscorrected);
+            return crc >> 16;
+        }
+        /// <summary>
+        /// Запись контрольной суммы файла в прошивку.
+        /// </summary>
+        /// <param name="firmware">Файл прошивки</param>
+        /// <param name="length">Длинна прошивки</param>
+        /// <param name="checksum">Значение контрольной суммы</param>
+        private static void WriteFirmwareCheckSum(byte[] firmware, int length, uint checksum)
+        {
+            var csbytes = BitConverter.GetBytes(checksum);
             firmware[length - 2] = csbytes[1];
             firmware[length - 1] = csbytes[0];
         }
@@ -327,6 +482,7 @@ namespace OESProgrammer
                 bin.Write(firmware);
             }
         }
+
         private static bool SendFirmWare(byte[] firmware)
         {
             try
@@ -380,14 +536,6 @@ namespace OESProgrammer
             }
             return false;
         }
-
-        /// <summary>
-        /// Преобразование к порядку байтов Little Endian
-        /// </summary>
-        /// <param name="data">Массив</param>
-        /// <param name="poss">Положение 1 байта числа</param>
-        /// <param name="size">Размер числа в байтах</param>
-        /// <returns></returns>
 
     }
     // Хранятся значения полей, введенных пользователем

@@ -19,8 +19,9 @@ namespace OESProgrammer
         private readonly byte[] _doNotClose = { 10, 0, 0, 0, 0, 0, 0, 0 };
         private static readonly DispatcherTimer DoNotCloseConnectionTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         private UdpClient _sender;
-        private UdpClient _resiver;
-        private IPEndPoint _endPoint;
+        private UdpClient _receiver;
+        private IPEndPoint _sendEndPoint;
+        private IPEndPoint _receiveEndPoint;
         private const int TimeOut = 100;
         private const int LocalPort = 40100;
         private const int RemotePort = 40101;
@@ -44,8 +45,8 @@ namespace OESProgrammer
         private void CapProgrammingWindow_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
             _sender = new UdpClient{Client = {SendTimeout = 100}};
-            _resiver = new UdpClient(LocalPort) { Client = { ReceiveTimeout = TimeOut, DontFragment = false } };
-            _endPoint = new IPEndPoint(IPAddress.Parse(_remoteIp), RemotePort);
+            _receiver = new UdpClient(LocalPort) { Client = { ReceiveTimeout = TimeOut, DontFragment = false } };
+            _sendEndPoint = new IPEndPoint(IPAddress.Parse(_remoteIp), RemotePort);
 
             // Подпись на событие, поддержания связи с STM
             DoNotCloseConnectionTimer.Tick += DoNotCloseConnectionTimer_Tick;
@@ -59,7 +60,7 @@ namespace OESProgrammer
         {
             DoNotCloseConnectionTimer.Stop();
             _sender.Close();
-            _resiver.Close();
+            _receiver.Close();
 
             e.Cancel = true;
             Hide();
@@ -71,7 +72,7 @@ namespace OESProgrammer
         {
             try
             {
-                _sender.Send(_doNotClose, _doNotClose.Length, _endPoint);
+                _sender.Send(_doNotClose, _doNotClose.Length, _sendEndPoint);
             }
             catch (SocketException)
             {
@@ -127,9 +128,9 @@ namespace OESProgrammer
                 try
                 {               
                     // Запрос на получения статуса крышеки
-                    _sender.Send(getCapStatus, getCapStatus.Length, _endPoint);
+                    _sender.Send(getCapStatus, getCapStatus.Length, _sendEndPoint);
                     // Ожидание ответа статуса крышек 
-                    var recData = _resiver.Receive(ref _endPoint);
+                    var recData = _receiver.Receive(ref _receiveEndPoint);
                     var data = new byte[recData.Length - 8];
 
                     Array.Copy(recData, 8, data, 0, data.Length);
@@ -214,9 +215,9 @@ namespace OESProgrammer
             {
                 try
                 {
-                    _sender.Send(comProgCap, comProgCap.Length, _endPoint);
+                    _sender.Send(comProgCap, comProgCap.Length, _sendEndPoint);
 
-                    var rec = _resiver.Receive(ref _endPoint);
+                    var rec = _receiver.Receive(ref _receiveEndPoint);
 
                     if (rec[0] != 0xc || rec[2] != 0x06)
                     {
