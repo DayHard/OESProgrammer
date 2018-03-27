@@ -9,7 +9,7 @@
         <GroupBox Header="Статус операции" HorizontalAlignment="Left" Height="57" Margin="0,218,0,0" VerticalAlignment="Top" Width="289" AutomationProperties.Name="Значение">
             <ProgressBar x:Name="PbOperationStatus" Height="20" Margin="0,0,0,0" VerticalAlignment="Center" Width="275" HorizontalAlignment="Center"/>
         </GroupBox>
-        <Button x:Name="BtnProgrammVpd" Content="Прошить" HorizontalAlignment="Left" Margin="205,287,0,0" VerticalAlignment="Top" Width="75" Click="BtnProgrammVpd_Click"/>
+        <Button x:Name="BtnProgrammVpd" Content="Прошить" HorizontalAlignment="Left" Margin="214,287,0,0" VerticalAlignment="Top" Width="75" Click="BtnProgrammVpd_Click"/>
         <Label Content="Номер прибора:" HorizontalAlignment="Left" Margin="104,4,0,0" VerticalAlignment="Top"/>
         <Label Content="Координата X канала 1, пиксель:" HorizontalAlignment="Left" Margin="16,30,0,0" VerticalAlignment="Top"/>
         <Label Content="Координата Y канала 1, пиксель:" HorizontalAlignment="Left" Margin="16,56,0,0" VerticalAlignment="Top"/>
@@ -31,6 +31,6 @@
             <ListBoxItem Content="Верс. 3"/>
             <ListBoxItem Content="Верс. 4"/>
         </ComboBox>
-        <Button x:Name="BtnGetFirmwareVersion" Content="Считать" HorizontalAlignment="Left" Margin="10,287,0,0" VerticalAlignment="Top" Width="75" Click="BtnGetFirmwareVersion_Click"/>
+        <Button x:Name="BtnGetFirmwareVersion" Content="Считать" HorizontalAlignment="Left" Margin="0,287,0,0" VerticalAlignment="Top" Width="75" Click="BtnGetFirmwareVersion_Click"/>
     </Grid>
 </Window>

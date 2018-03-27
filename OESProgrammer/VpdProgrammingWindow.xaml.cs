@@ -135,7 +135,7 @@ namespace OESProgrammer
             const int fwsize = 262144;
             int counter = 0;
             var firmware = new byte[fwsize];
-            PbOperationStatus.Maximum = fwsize;
+            Dispatcher.Invoke(() => { PbOperationStatus.Maximum = fwsize; });
 
             #endregion
 
@@ -171,7 +171,7 @@ namespace OESProgrammer
                 }
             }
             // После скачивания зануляем статусбар
-            PbOperationStatus.Value = 0;
+            Dispatcher.Invoke(() => { PbOperationStatus.Value = 0; });
             return firmware;
         }
         /// <summary>
@@ -213,39 +213,22 @@ namespace OESProgrammer
         private static int SetFirmwareVersion(byte[] fw)
         {
             const int length = 262079;
-
             var fwloaded = new byte[length];
             var fwsource = new byte[length];
+            var fwName = new[] { FwName1, FwName2, FwName3, FwName4 };
+
             Array.Copy(fw, fwloaded, fwloaded.Length);
 
-            // Проверяем соответствие 1 прошивки
-            byte[] firmware1 = (byte[])Properties.Resources.ResourceManager.GetObject(FwName1);
-            // ReSharper disable once AssignNullToNotNullAttribute
-            Array.Copy(firmware1,fwsource, fwsource.Length);
-            if (Equals(fwloaded, fwsource))
-                return 0;
+            for (int i = 0; i < 4; i++)
+            {
+                byte[] firmware = (byte[])Properties.Resources.ResourceManager.GetObject(fwName[i]);
 
-            // Проверяем соответствие 2 прошивки
-            byte[] firmware2 = (byte[])Properties.Resources.ResourceManager.GetObject(FwName2);
-            // ReSharper disable once AssignNullToNotNullAttribute
-            Array.Copy(firmware2, fwsource, fwsource.Length);
-            if (Equals(fwloaded, fwsource))
-                return 1;
+                if(firmware == null) continue;
+                Array.Copy(firmware, fwsource, fwsource.Length);
 
-            // Проверяем соответствие 3 прошивки
-            byte[] firmware3 = (byte[])Properties.Resources.ResourceManager.GetObject(FwName3);
-            // ReSharper disable once AssignNullToNotNullAttribute
-            Array.Copy(firmware3, fwsource, fwsource.Length);
-            if (Equals(fwloaded, fwsource))
-                return 2;
-
-            // Проверяем соответствие 4 прошивки
-            byte[] firmware4 = (byte[])Properties.Resources.ResourceManager.GetObject(FwName4);
-            // ReSharper disable once AssignNullToNotNullAttribute
-            Array.Copy(firmware4, fwsource, fwsource.Length);
-            if (Equals(fwloaded, fwsource))
-                return 3;
-
+                if (Equals(fwloaded, fwsource))
+                    return i;
+            }
             return -1;
         }
         /// <summary>
