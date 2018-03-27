@@ -24,6 +24,10 @@ namespace OESProgrammer
         private const int TimeOut = 100;
         private const int LocalPort = 40100;
         private const int RemotePort = 40101;
+        private const string fwName1 = "_7315_01_22_100_DD6_DD9_V1";
+        private const string fwName2 = "_7315_01_22_100_DD6_DD9_V2";
+        private const string fwName3 = "_7315_01_22_200_DD6_DD9_V3";
+        private const string fwName4 = "_7315_01_22_200_DD6_DD9_V4";
         private readonly byte[] _doNotClose = { 10, 0, 0, 0, 0, 0, 0, 0 };
         private static readonly DispatcherTimer DoNotCloseConnectionTimer = new DispatcherTimer {Interval = TimeSpan.FromSeconds(1)};
         private static string _remoteIp;
@@ -132,6 +136,7 @@ namespace OESProgrammer
             int counter = 0;
             var firmware = new byte[fwsize];
             PbOperationStatus.Maximum = fwsize;
+
             #endregion
 
             // Запрос на подготовку прошивки
@@ -173,7 +178,7 @@ namespace OESProgrammer
         /// Декодирование пользовательских параметров из файла прошивки
         /// </summary>
         /// <param name="firmware">Файл прошивки</param>
-        private void DecodeFirmwareSettings(byte[] firmware)
+        private static void DecodeFirmwareSettings(byte[] firmware)
         {
             // Номер прибора
             FwConfig.Device = (ushort)ToLittleEndian(firmware, 262082, 2);
@@ -196,6 +201,56 @@ namespace OESProgrammer
             // Фокус 2 канала (*10 [почему - никто не помнит, для всех])
             FwConfig.FokusChannel2 = (double)ToLittleEndian(firmware, 262094, 2) / 10;
 
+            //Версия прошивки
+            FwConfig.FirmwareVersion = SetFirmwareVersion(firmware);
+
+        }
+        /// <summary>
+        /// Сравнение версий прошивок на соответствие исходным
+        /// </summary>
+        /// <param name="fw">Скачанный файл прошивки</param>
+        /// <returns>Индекс соответствующей прошивки</returns>
+        private static int SetFirmwareVersion(byte[] fw)
+        {
+            const int length = 262079;
+
+            var fwloaded = new byte[length];
+            var fwsource = new byte[length];
+            Array.Copy(fw, fwloaded, fwloaded.Length);
+
+            // Проверяем соответствие 1 прошивки
+            object obj1 = Properties.Resources.ResourceManager.GetObject(fwName1);
+            byte[] firmware1 = (byte[])obj1;
+            // ReSharper disable once AssignNullToNotNullAttribute
+            Array.Copy(firmware1,fwsource, fwsource.Length);
+            if (Equals(fwloaded, fwsource))
+                return 0;
+
+            // Проверяем соответствие 2 прошивки
+            object obj2 = Properties.Resources.ResourceManager.GetObject(fwName2);
+            byte[] firmware2 = (byte[])obj2;
+            // ReSharper disable once AssignNullToNotNullAttribute
+            Array.Copy(firmware2, fwsource, fwsource.Length);
+            if (Equals(fwloaded, fwsource))
+                return 1;
+
+            // Проверяем соответствие 3 прошивки
+            object obj3 = Properties.Resources.ResourceManager.GetObject(fwName3);
+            byte[] firmware3 = (byte[])obj3;
+            // ReSharper disable once AssignNullToNotNullAttribute
+            Array.Copy(firmware3, fwsource, fwsource.Length);
+            if (Equals(fwloaded, fwsource))
+                return 2;
+
+            // Проверяем соответствие 4 прошивки
+            object obj4 = Properties.Resources.ResourceManager.GetObject(fwName4);
+            byte[] firmware4 = (byte[])obj4;
+            // ReSharper disable once AssignNullToNotNullAttribute
+            Array.Copy(firmware4, fwsource, fwsource.Length);
+            if (Equals(fwloaded, fwsource))
+                return 3;
+
+            return -1;
         }
         /// <summary>
         /// Установка полей пользовательского интерфейс в соответсвии с данными прошивки
@@ -209,6 +264,7 @@ namespace OESProgrammer
             TbCoordYChannel2.Text = FwConfig.CoordYChannel2.ToString();
             TbFocusChannel1.Text = FwConfig.FokusChannel1.ToString(CultureInfo.InvariantCulture);
             TbFocusChannel2.Text = FwConfig.FokusChannel2.ToString(CultureInfo.InvariantCulture);
+            CbVersions.SelectedIndex = FwConfig.FirmwareVersion;
         }
         private void BtnProgrammVpd_Click(object sender, RoutedEventArgs e)
         {
@@ -325,16 +381,16 @@ namespace OESProgrammer
             switch (FwConfig.FirmwareVersion)
             {
                 case 0:
-                    fwName = "_7315_01_22_100_DD6_DD9_V1";
+                    fwName = fwName1;
                     break;
                 case 1:
-                    fwName = "_7315_01_22_100_DD6_DD9_V2";
+                    fwName = fwName2;
                     break;
                 case 2:
-                    fwName = "_7315_01_22_200_DD6_DD9_V3";
+                    fwName = fwName3;
                     break;
                 case 3:
-                    fwName = "_7315_01_22_200_DD6_DD9_V4";
+                    fwName = fwName4;
                     break;
             }
 
