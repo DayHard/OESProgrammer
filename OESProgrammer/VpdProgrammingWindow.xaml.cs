@@ -24,10 +24,10 @@ namespace OESProgrammer
         private const int TimeOut = 100;
         private const int LocalPort = 40100;
         private const int RemotePort = 40101;
-        private const string fwName1 = "_7315_01_22_100_DD6_DD9_V1";
-        private const string fwName2 = "_7315_01_22_100_DD6_DD9_V2";
-        private const string fwName3 = "_7315_01_22_200_DD6_DD9_V3";
-        private const string fwName4 = "_7315_01_22_200_DD6_DD9_V4";
+        private const string FwName1 = "_7315_01_22_100_DD6_DD9_V1";
+        private const string FwName2 = "_7315_01_22_100_DD6_DD9_V2";
+        private const string FwName3 = "_7315_01_22_200_DD6_DD9_V3";
+        private const string FwName4 = "_7315_01_22_200_DD6_DD9_V4";
         private readonly byte[] _doNotClose = { 10, 0, 0, 0, 0, 0, 0, 0 };
         private static readonly DispatcherTimer DoNotCloseConnectionTimer = new DispatcherTimer {Interval = TimeSpan.FromSeconds(1)};
         private static string _remoteIp;
@@ -219,32 +219,28 @@ namespace OESProgrammer
             Array.Copy(fw, fwloaded, fwloaded.Length);
 
             // Проверяем соответствие 1 прошивки
-            object obj1 = Properties.Resources.ResourceManager.GetObject(fwName1);
-            byte[] firmware1 = (byte[])obj1;
+            byte[] firmware1 = (byte[])Properties.Resources.ResourceManager.GetObject(FwName1);
             // ReSharper disable once AssignNullToNotNullAttribute
             Array.Copy(firmware1,fwsource, fwsource.Length);
             if (Equals(fwloaded, fwsource))
                 return 0;
 
             // Проверяем соответствие 2 прошивки
-            object obj2 = Properties.Resources.ResourceManager.GetObject(fwName2);
-            byte[] firmware2 = (byte[])obj2;
+            byte[] firmware2 = (byte[])Properties.Resources.ResourceManager.GetObject(FwName2);
             // ReSharper disable once AssignNullToNotNullAttribute
             Array.Copy(firmware2, fwsource, fwsource.Length);
             if (Equals(fwloaded, fwsource))
                 return 1;
 
             // Проверяем соответствие 3 прошивки
-            object obj3 = Properties.Resources.ResourceManager.GetObject(fwName3);
-            byte[] firmware3 = (byte[])obj3;
+            byte[] firmware3 = (byte[])Properties.Resources.ResourceManager.GetObject(FwName3);
             // ReSharper disable once AssignNullToNotNullAttribute
             Array.Copy(firmware3, fwsource, fwsource.Length);
             if (Equals(fwloaded, fwsource))
                 return 2;
 
             // Проверяем соответствие 4 прошивки
-            object obj4 = Properties.Resources.ResourceManager.GetObject(fwName4);
-            byte[] firmware4 = (byte[])obj4;
+            byte[] firmware4 = (byte[])Properties.Resources.ResourceManager.GetObject(FwName4);
             // ReSharper disable once AssignNullToNotNullAttribute
             Array.Copy(firmware4, fwsource, fwsource.Length);
             if (Equals(fwloaded, fwsource))
@@ -381,23 +377,20 @@ namespace OESProgrammer
             switch (FwConfig.FirmwareVersion)
             {
                 case 0:
-                    fwName = fwName1;
+                    fwName = FwName1;
                     break;
                 case 1:
-                    fwName = fwName2;
+                    fwName = FwName2;
                     break;
                 case 2:
-                    fwName = fwName3;
+                    fwName = FwName3;
                     break;
                 case 3:
-                    fwName = fwName4;
+                    fwName = FwName4;
                     break;
             }
 
-            object obj = Properties.Resources.ResourceManager.GetObject(fwName);
-
-            byte[] firmware = (byte[])obj;
-
+            byte[] firmware = (byte[])Properties.Resources.ResourceManager.GetObject(fwName);
             if (firmware == null) return null;
 
             // Флаг начала структуры
