@@ -133,43 +133,38 @@ namespace OESProgrammer
         private async void GetFirmwareVersion()
         {
             await Task.Run(() =>
-            {
+            {                
+                // Отключение кнопок Считать\Прошить 
                 SetButtonsDisable();
-                //var fw = GetFirmwareFromOed();
 
-                Dispatcher.Invoke(() => {GetFirmwareSettings();});
+                // Скачивание прошивки из ВПУ
+                var fw = GetFirmwareFromOed();
 
-                FwConfig.FirmwareVersion = 3;
-                var fw = PrepareFirmware();
-                if (fw == null) throw new Exception("В ходе подготовки прошивки произошла ошибка.");
-
-                var cs = CountFirmwareControlSum(fw, fw.Length - 2);
-                WriteFirmwareCheckSum(fw, fw.Length - 2, cs);
-
-                using (var bin = new BinaryWriter(File.OpenWrite("1.bex")))
+                // Проверка контрольной суммый структуры с параметрами пользователя
+                var cstrcs = CountStructControlsSum(fw);
+                var rstrcs = ReadStructCheckSum(fw);
+                if (cstrcs != rstrcs)
                 {
-                    bin.Write(fw);
+                    MessageBox.Show(this, "Ошибка скачивания. Параметры повреждены.", "Ошибка",
+                        MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
                 }
 
 
-
-
-
-                var cstrcs = CountStructControlsSum(fw);
-                var rstrcs = ReadStructCheckSum(fw);
-                if (cstrcs != rstrcs) throw new Exception("Ошибка проверки контрольный сум структуры.");
-
-                var rfwcs = ReadFirmwareCheckSum(fw);
-                fw[262140] = fw[262141] = 0;               
-                var cfwcs = CountFirmwareControlSum(fw, fw.Length - 2);
-                if(rfwcs != cfwcs) throw new Exception("Контрольная сумма файла прошивки не совпадает.");
-                WriteFirmwareCheckSum(fw, fw.Length - 2, cfwcs);
-
+                // Проверка контрольной суммы всего файла
                 var zerofwcs = CountFirmwareControlSum(fw, fw.Length);
-                if (zerofwcs != 0) throw new Exception("Контрольная сумма файла прошивки не совпадает.");
+                if (zerofwcs != 0)
+                {
+                     MessageBox.Show(this, "Ошибка скачивания. Файл прошивки поврежден.", "Ошибка",
+                        MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+                }
 
+                // Декодирвание параметров из файла прошивки (хранятся в классе FwConfig)
                 DecodeFirmwareSettings(fw);
+                // Применение декодированных параметров к TextBox 
                 SetFirmwareSettings();
+                // Включение кнопок Считать\Прошить
                 SetButtonsEnable();
             });
         }
@@ -538,15 +533,6 @@ namespace OESProgrammer
             return ToBigEndian(fw, 262098, 2);
         }
         /// <summary>
-        /// Считывание контрольной суммы файла прошивки
-        /// </summary>
-        /// <param name="fw">Файл прошивки</param>
-        /// <returns></returns>
-        private static int ReadFirmwareCheckSum(byte[] fw)
-        {
-            return ToBigEndian(fw,262140, 2);
-        }
-        /// <summary>
         /// Расчет контрольной суммы файла прошивки
         /// </summary>
         /// <param name="firmware">Файл прошивки</param>
@@ -557,19 +543,13 @@ namespace OESProgrammer
             // Портировано из исходников прошлой программы.
             uint crc = 0;
             const uint polynom = 0x80050000;
-            // Зануление, для правильного расчета контрольной суммы
-            if (firmware[262140] == 0xff && firmware[262141] == 0xff && firmware[262142] == 0xff && firmware[262143] == 0xff)
-                firmware[262140] = firmware[262141] = firmware[262142] = firmware[262143] = 0;
-
+            //// Зануление, для правильного расчета контрольной суммы
+            firmware[length - 1] = firmware[length - 2] = 0;
 
             crc += (uint)firmware[0] << 24;
             crc += (uint)firmware[1] << 16;
             for (int i = 2; i < length; i += 2)
             {
-                if (i == 262140)
-                {
-                  
-                }
                 crc += (uint)(firmware[i] << 8);
                 crc += firmware[i + 1];
                 for (int j = 0; j < 16; j++)
