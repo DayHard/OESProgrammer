@@ -139,41 +139,58 @@ namespace OESProgrammer
 
             #endregion
 
-            // Запрос на подготовку прошивки
-            _sender.Send(comLoadFwtoMem, comLoadFwtoMem.Length, _sendEndPoint);
-            Thread.Sleep(1000);
-
-            while (counter < fwsize)
-            {                         
+            try
+            {
                 // Запрос на подготовку прошивки
-                _sender.Send(comGetMe2048, comGetMe2048.Length, _sendEndPoint);
-                for (int i = 0; i < 2; i++)
-                {                       
-                    // Запрос на получение блока данных (2048)
-                    var resivedData = _receiver.Receive(ref _receiveEndPoint);
+                _sender.Send(comLoadFwtoMem, comLoadFwtoMem.Length, _sendEndPoint);
+                Thread.Sleep(1000);
 
-                    if (firmware.Length - counter >= 1024)
+                while (counter < fwsize)
+                {
+                    // Запрос на подготовку прошивки
+                    _sender.Send(comGetMe2048, comGetMe2048.Length, _sendEndPoint);
+                    for (int i = 0; i < 2; i++)
                     {
-                        Array.Copy(resivedData, 8, firmware, counter, resivedData.Length - 8);
-                        counter += resivedData.Length - 8;
+
+                        // Запрос на получение блока данных (2048)
+                        var resivedData = _receiver.Receive(ref _receiveEndPoint);
+
+                        if (firmware.Length - counter >= 1024)
+                        {
+                            Array.Copy(resivedData, 8, firmware, counter, resivedData.Length - 8);
+                            counter += resivedData.Length - 8;
+                        }
+                        else
+                        {
+                            Array.Copy(resivedData, 8, firmware, counter, firmware.Length - counter);
+                            counter += firmware.Length - counter;
+                        }
+                        // Изменяем значение прогресс бара
+                        var counter1 = counter;
+                        Dispatcher.Invoke(() =>
+                        {
+                            PbOperationStatus.Value = counter1;
+                        });
                     }
-                    else
-                    {
-                        Array.Copy(resivedData, 8, firmware, counter, firmware.Length - counter);
-                        counter += firmware.Length - counter;
-                    }
-                    // Изменяем значение прогресс бара
-                    var counter1 = counter;
-                    Dispatcher.Invoke(() =>
-                    {
-                        PbOperationStatus.Value = counter1;
-                    });
                 }
             }
-            // После скачивания зануляем статусбар
-            Dispatcher.Invoke(() => { PbOperationStatus.Value = 0; });
+            catch (SocketException)
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    MessageBox.Show(this, "Ошибка приема данных. Timeout.", "Ошибка", MessageBoxButton.OK,
+                        MessageBoxImage.Error);
+                });
+            }
+            finally
+            {
+
+                // После скачивания зануляем статусбар
+                Dispatcher.Invoke(() => { PbOperationStatus.Value = 0; });
+            }
             return firmware;
         }
+
         /// <summary>
         /// Декодирование пользовательских параметров из файла прошивки
         /// </summary>
@@ -236,14 +253,17 @@ namespace OESProgrammer
         /// </summary>
         private void SetFirmwareSettings()
         {
-            TbDeviceNumber.Text = FwConfig.Device.ToString();
-            TbCoordXChannel1.Text = FwConfig.CoordXChannel1.ToString();
-            TbCoordYChannel1.Text = FwConfig.CoordYChannel1.ToString();
-            TbCoordXChannel2.Text = FwConfig.CoordXChannel2.ToString();
-            TbCoordYChannel2.Text = FwConfig.CoordYChannel2.ToString();
-            TbFocusChannel1.Text = FwConfig.FokusChannel1.ToString(CultureInfo.InvariantCulture);
-            TbFocusChannel2.Text = FwConfig.FokusChannel2.ToString(CultureInfo.InvariantCulture);
-            CbVersions.SelectedIndex = FwConfig.FirmwareVersion;
+            Dispatcher.Invoke(() =>
+            {
+                TbDeviceNumber.Text = FwConfig.Device.ToString();
+                TbCoordXChannel1.Text = FwConfig.CoordXChannel1.ToString();
+                TbCoordYChannel1.Text = FwConfig.CoordYChannel1.ToString();
+                TbCoordXChannel2.Text = FwConfig.CoordXChannel2.ToString();
+                TbCoordYChannel2.Text = FwConfig.CoordYChannel2.ToString();
+                TbFocusChannel1.Text = FwConfig.FokusChannel1.ToString(CultureInfo.InvariantCulture);
+                TbFocusChannel2.Text = FwConfig.FokusChannel2.ToString(CultureInfo.InvariantCulture);
+                CbVersions.SelectedIndex = FwConfig.FirmwareVersion; 
+            });
         }
         private void BtnProgrammVpd_Click(object sender, RoutedEventArgs e)
         {
