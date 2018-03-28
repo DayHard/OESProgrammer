@@ -101,14 +101,20 @@ namespace OESProgrammer
         /// </summary>
         private void SetStatusSuccess()
         {
-            LabStatusOperation.Content = "Успех.";
+            Dispatcher.Invoke(()=>
+            {
+                LabStatusOperation.Content = "[" + DateTime.Now + "]" + " Успех.";
+            });
         }
         /// <summary>
         /// Установка значения статуса операции Ошибка
         /// </summary>
         private void SetStatusFail()
         {
-            LabStatusOperation.Content = "Ошибка.";
+            Dispatcher.Invoke(() =>
+            {
+                LabStatusOperation.Content ="[" + DateTime.Now + "]" + " Ошибка.";
+            });
         }
         #endregion
 
@@ -146,9 +152,11 @@ namespace OESProgrammer
                         });
                         return;
                     }
-
-                    TbCapSensorOpen.Text = ToLittleEndian(data, 1, 2).ToString();
-                    TbCapSensorClose.Text = ToLittleEndian(data, 3, 2).ToString();
+                    Dispatcher.Invoke(() => 
+                    {
+                        TbCapSensorOpen.Text = ToLittleEndian(data, 1, 2).ToString();
+                        TbCapSensorClose.Text = ToLittleEndian(data, 3, 2).ToString();
+                    });
                 }
                 catch (SocketException)
                 {

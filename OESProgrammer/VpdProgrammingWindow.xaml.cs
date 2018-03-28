@@ -89,6 +89,27 @@ namespace OESProgrammer
             }
             return arr.Select((t, i) => t << i * 8).Sum();
         }
+        /// <summary>
+        /// Преобразование к порядку байтов Big Endian
+        /// </summary>
+        /// <param name="data">Массив</param>
+        /// <param name="poss">Положение 1 байта числа</param>
+        /// <param name="size">Размер числа в байтах</param>
+        /// <returns></returns>
+        private static int ToBigEndian(byte[] data, int poss, int size)
+        {
+            var arr = new byte[size];
+            for (int i = 0; i < arr.Length; i++)
+            {
+                arr[i] = data[poss + i];
+            }
+            int result = 0;
+            for (int i = 0; i < arr.Length; i++)
+            {
+                result |= arr[i] << 8 * (size - 1 - i);
+            }
+            return result;
+        }
 
         #endregion
 
@@ -96,19 +117,26 @@ namespace OESProgrammer
         {
             GetFirmwareVersion();
         }
-
         private async void GetFirmwareVersion()
         {
             await Task.Run(() =>
             {
                 var fw = GetFirmwareFromOed();
 
+                using (var bin = new BinaryWriter(File.OpenWrite("1.bex")))
+                {
+                    bin.Write(fw);
+                }
+
                 var cstrcs = CountStructControlsSum(fw);
                 var rstrcs = ReadStructCheckSum(fw);
                 if (cstrcs != rstrcs) throw new Exception("Ошибка проверки контрольный сум структуры.");
 
-                var cfwcs = CountFirmwareControlSum(fw, fw.Length);
-                if (cfwcs != 0) throw new Exception("Контрольная сумма файла прошивки не совпадает.");
+                var cfwcs = CountFirmwareControlSum(fw, fw.Length - 2);
+                var rfwcs = ReadFirmwareCheckSum(fw);
+                var zerofwcs = CountFirmwareControlSum(fw, fw.Length);
+                //if (cfwcs != rfwcs || zerofwcs != 0) throw new Exception("Контрольная сумма файла прошивки не совпадает.");
+                //if (cfwcs != 0) throw new Exception("Контрольная сумма файла прошивки не совпадает.");
 
                 DecodeFirmwareSettings(fw);
                 SetFirmwareSettings();
@@ -198,25 +226,25 @@ namespace OESProgrammer
         private static void DecodeFirmwareSettings(byte[] firmware)
         {
             // Номер прибора
-            FwConfig.Device = (ushort)ToLittleEndian(firmware, 262082, 2);
+            FwConfig.Device = (ushort)ToBigEndian(firmware, 262082, 2);
 
             // Координата Х канал 1 (*16 [почему - никто не помнит, для все координат])
-            FwConfig.CoordXChannel1 = (byte)(ToLittleEndian(firmware, 262084, 2) / 16);
+            FwConfig.CoordXChannel1 = (byte)(ToBigEndian(firmware, 262084, 2) / 16);
 
-            // Координата Х канал 1 (*16 [почему - никто не помнит, для все координат])
-            FwConfig.CoordYChannel1 = (byte)(ToLittleEndian(firmware, 262086, 2) / 16);
+            // Координата Y канал 1 (*16 [почему - никто не помнит, для все координат])
+            FwConfig.CoordYChannel1 = (byte)(ToBigEndian(firmware, 262086, 2) / 16);
 
             // Координата Х канал 2 (*16 [почему - никто не помнит, для все координат])
-            FwConfig.CoordXChannel2 = (byte)(ToLittleEndian(firmware, 262088, 2) / 16);
+            FwConfig.CoordXChannel2 = (byte)(ToBigEndian(firmware, 262088, 2) / 16);
 
             // Координата Y канал 2 (*16 [почему - никто не помнит, для все координат])
-            FwConfig.CoordYChannel1 = (byte)(ToLittleEndian(firmware, 262090, 2) / 16);
+            FwConfig.CoordYChannel2 = (byte)(ToBigEndian(firmware, 262090, 2) / 16);
 
             // Фокус 1 канала (*10 [почему - никто не помнит, для всех фокусов])
-            FwConfig.FokusChannel1 = (double)ToLittleEndian(firmware, 262092, 2) / 10;
+            FwConfig.FokusChannel1 = (double)ToBigEndian(firmware, 262092, 2) / 10;
 
             // Фокус 2 канала (*10 [почему - никто не помнит, для всех])
-            FwConfig.FokusChannel2 = (double)ToLittleEndian(firmware, 262094, 2) / 10;
+            FwConfig.FokusChannel2 = (double)ToBigEndian(firmware, 262094, 2) / 10;
 
             //Версия прошивки
             FwConfig.FirmwareVersion = SetFirmwareVersion(firmware);
@@ -243,7 +271,7 @@ namespace OESProgrammer
                 if(firmware == null) continue;
                 Array.Copy(firmware, fwsource, fwsource.Length);
 
-                if (Equals(fwloaded, fwsource))
+                if (fwsource.SequenceEqual(fwloaded))
                     return i;
             }
             return -1;
@@ -475,7 +503,16 @@ namespace OESProgrammer
         /// <returns>Контрольную сумму</returns>
         private static int ReadStructCheckSum(byte[] fw)
         {
-            return ToLittleEndian(fw, 262098, 2);
+            return ToBigEndian(fw, 262098, 2);
+        }
+        /// <summary>
+        /// Считывание контрольной суммы файла прошивки
+        /// </summary>
+        /// <param name="fw">Файл прошивки</param>
+        /// <returns></returns>
+        private static int ReadFirmwareCheckSum(byte[] fw)
+        {
+            return ToBigEndian(fw,262140, 2);
         }
         /// <summary>
         /// Расчет контрольной суммы файла прошивки
@@ -488,12 +525,12 @@ namespace OESProgrammer
             // Портировано из исходников прошлой программы.
             uint crc = 0;
             const uint polynom = 0x80050000;
-            firmware[length - 1] = 0;
-            firmware[length - 2] = 0;
+            firmware[firmware.Length - 1] = 0;
+            firmware[firmware.Length - 2] = 0;
+
 
             crc += (uint)firmware[0] << 24;
             crc += (uint)firmware[1] << 16;
-
             for (int i = 2; i < length; i += 2)
             {
                 crc += (uint)(firmware[i] << 8);
