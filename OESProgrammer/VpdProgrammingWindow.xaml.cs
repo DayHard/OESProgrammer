@@ -366,19 +366,19 @@ namespace OESProgrammer
             FwConfig.CoordYChannel2 = coordYChannel2;
 
             double focusChannel1;
-            double.TryParse(TbFocusChannel1.Text, out focusChannel1);
+            double.TryParse(TbFocusChannel1.Text.Replace(".", ","), out focusChannel1);
             if (focusChannel1 < 49 || focusChannel1 > 55)
             {
-                MessageBox.Show(this, "Фокус канала 1 может принимать значения от 49 до 55, с шагов 0,1", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show(this, "Фокус канала 1 может принимать значения от 49 до 55, с шагом 0,1", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
                 return false;
             }
             FwConfig.FokusChannel1 = focusChannel1;
 
             double focusChannel2;
-            double.TryParse(TbFocusChannel2.Text, out focusChannel2);
+            double.TryParse(TbFocusChannel2.Text.Replace(".", ","), out focusChannel2);
             if (focusChannel2 < 320 || focusChannel2 > 340)
             {
-                MessageBox.Show(this, "Фокус канала 2 может принимать значения от 320 до 340, с шагов 0,1", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show(this, "Фокус канала 2 может принимать значения от 320 до 340, с шагом 0,1", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
                 return false;
             }
             FwConfig.FokusChannel2 = focusChannel2;
