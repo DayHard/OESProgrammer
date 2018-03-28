@@ -80,14 +80,27 @@ namespace OESProgrammer
                 MessageBox.Show(this, "Невозможно отправить команду перехвата управления в STM: " + ex.Message, "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
-        private static int ToLittleEndian(byte[] data, int poss, int size)
+        /// <summary>
+        /// Включение кнопок Считать\Прошить
+        /// </summary>
+        private void SetButtonsEnable()
         {
-            var arr = new byte[size];
-            for (int i = 0; i < arr.Length; i++)
+            Dispatcher.Invoke(() =>
             {
-                arr[i] = data[poss + i];
-            }
-            return arr.Select((t, i) => t << i * 8).Sum();
+                BtnGetFirmwareVersion.IsEnabled = true;
+                BtnProgrammVpd.IsEnabled = true; 
+            });
+        }
+        /// <summary>
+        /// Выключение кнопок Считать\Прошить
+        /// </summary>
+        private void SetButtonsDisable()
+        {
+            Dispatcher.Invoke(() =>
+            {
+                BtnGetFirmwareVersion.IsEnabled = false;
+                BtnProgrammVpd.IsEnabled = false;
+            });
         }
         /// <summary>
         /// Преобразование к порядку байтов Big Endian
@@ -121,25 +134,43 @@ namespace OESProgrammer
         {
             await Task.Run(() =>
             {
-                var fw = GetFirmwareFromOed();
+                SetButtonsDisable();
+                //var fw = GetFirmwareFromOed();
+
+                Dispatcher.Invoke(() => {GetFirmwareSettings();});
+
+                FwConfig.FirmwareVersion = 3;
+                var fw = PrepareFirmware();
+                if (fw == null) throw new Exception("В ходе подготовки прошивки произошла ошибка.");
+
+                var cs = CountFirmwareControlSum(fw, fw.Length - 2);
+                WriteFirmwareCheckSum(fw, fw.Length - 2, cs);
 
                 using (var bin = new BinaryWriter(File.OpenWrite("1.bex")))
                 {
                     bin.Write(fw);
                 }
 
+
+
+
+
                 var cstrcs = CountStructControlsSum(fw);
                 var rstrcs = ReadStructCheckSum(fw);
                 if (cstrcs != rstrcs) throw new Exception("Ошибка проверки контрольный сум структуры.");
 
-                var cfwcs = CountFirmwareControlSum(fw, fw.Length - 2);
                 var rfwcs = ReadFirmwareCheckSum(fw);
+                fw[262140] = fw[262141] = 0;               
+                var cfwcs = CountFirmwareControlSum(fw, fw.Length - 2);
+                if(rfwcs != cfwcs) throw new Exception("Контрольная сумма файла прошивки не совпадает.");
+                WriteFirmwareCheckSum(fw, fw.Length - 2, cfwcs);
+
                 var zerofwcs = CountFirmwareControlSum(fw, fw.Length);
-                //if (cfwcs != rfwcs || zerofwcs != 0) throw new Exception("Контрольная сумма файла прошивки не совпадает.");
-                //if (cfwcs != 0) throw new Exception("Контрольная сумма файла прошивки не совпадает.");
+                if (zerofwcs != 0) throw new Exception("Контрольная сумма файла прошивки не совпадает.");
 
                 DecodeFirmwareSettings(fw);
                 SetFirmwareSettings();
+                SetButtonsEnable();
             });
         }
 
@@ -298,6 +329,7 @@ namespace OESProgrammer
             if (!GetFirmwareSettings())
                 return;
 
+            SetButtonsDisable();
             var firmware = PrepareFirmware();
             if (firmware == null) throw new Exception("В ходе подготовки прошивки произошла ошибка.");
 
@@ -312,7 +344,7 @@ namespace OESProgrammer
             SaveFinishedFirmware(firmware);
 
             //if (!SendFirmWare(firmware)) return;
-
+            SetButtonsEnable();
         }
         /// <summary>
         /// Считывание параметров, введенных пользователем, а также проверка на валидность.
@@ -525,14 +557,19 @@ namespace OESProgrammer
             // Портировано из исходников прошлой программы.
             uint crc = 0;
             const uint polynom = 0x80050000;
-            firmware[firmware.Length - 1] = 0;
-            firmware[firmware.Length - 2] = 0;
+            // Зануление, для правильного расчета контрольной суммы
+            if (firmware[262140] == 0xff && firmware[262141] == 0xff && firmware[262142] == 0xff && firmware[262143] == 0xff)
+                firmware[262140] = firmware[262141] = firmware[262142] = firmware[262143] = 0;
 
 
             crc += (uint)firmware[0] << 24;
             crc += (uint)firmware[1] << 16;
             for (int i = 2; i < length; i += 2)
             {
+                if (i == 262140)
+                {
+                  
+                }
                 crc += (uint)(firmware[i] << 8);
                 crc += firmware[i + 1];
                 for (int j = 0; j < 16; j++)

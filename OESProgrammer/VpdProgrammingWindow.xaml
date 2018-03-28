@@ -17,13 +17,13 @@
         <Label Content="Координата Y канала 2, пиксель:" HorizontalAlignment="Left" Margin="16,108,0,0" VerticalAlignment="Top"/>
         <Label Content="Фокус канала 1, мм:" HorizontalAlignment="Left" Margin="86,134,0,0" VerticalAlignment="Top"/>
         <Label Content="Фокус канала 2, мм:" HorizontalAlignment="Left" Margin="86,160,0,0" VerticalAlignment="Top"/>
-        <TextBox x:Name="TbDeviceNumber" HorizontalAlignment="Left" Height="20" Margin="210,10,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="70" Text="42"/>
-        <TextBox x:Name="TbCoordXChannel1" HorizontalAlignment="Left" Height="20" Margin="210,36,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="70" Text="0"/>
-        <TextBox x:Name="TbCoordYChannel1" HorizontalAlignment="Left" Height="20" Margin="210,60,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="70" Text="0"/>
-        <TextBox x:Name="TbCoordXChannel2" HorizontalAlignment="Left" Height="20" Margin="210,87,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="70" Text="0"/>
-        <TextBox x:Name="TbCoordYChannel2" HorizontalAlignment="Left" Height="20" Margin="210,112,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="70" Text="0"/>
-        <TextBox x:Name="TbFocusChannel1" HorizontalAlignment="Left" Height="20" Margin="210,140,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="70" Text="49"/>
-        <TextBox x:Name="TbFocusChannel2" HorizontalAlignment="Left" Height="20" Margin="210,165,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="70" Text="320"/>
+        <TextBox x:Name="TbDeviceNumber" HorizontalAlignment="Left" Height="20" Margin="210,10,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="70" Text="1164"/>
+        <TextBox x:Name="TbCoordXChannel1" HorizontalAlignment="Left" Height="20" Margin="210,36,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="70" Text="96"/>
+        <TextBox x:Name="TbCoordYChannel1" HorizontalAlignment="Left" Height="20" Margin="210,60,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="70" Text="151"/>
+        <TextBox x:Name="TbCoordXChannel2" HorizontalAlignment="Left" Height="20" Margin="210,87,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="70" Text="136"/>
+        <TextBox x:Name="TbCoordYChannel2" HorizontalAlignment="Left" Height="20" Margin="210,112,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="70" Text="151"/>
+        <TextBox x:Name="TbFocusChannel1" HorizontalAlignment="Left" Height="20" Margin="210,140,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="70" Text="50,7"/>
+        <TextBox x:Name="TbFocusChannel2" HorizontalAlignment="Left" Height="20" Margin="210,165,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="70" Text="331,3"/>
         <Label Content="Версия прошивки:" HorizontalAlignment="Left" Margin="86,187,0,0" VerticalAlignment="Top"/>
         <ComboBox x:Name="CbVersions" HorizontalAlignment="Left" Margin="210,191,0,0" VerticalAlignment="Top" Width="70">
             <ListBoxItem Content="Верс. 1"/>
