@@ -401,14 +401,12 @@ namespace OESProgrammer
                             MessageBox.Show(this, "Ошибка в ходе вторичной верификации. Не перезагружайте ВПУ!", "ВНИМАНИЕ",
                                 MessageBoxButton.OK, MessageBoxImage.Warning);
                         });
-                        return;
                     }
                 }
                 else
                 {
                     MessageBox.Show(this, "Ошибка в ходе первичной верификации.", "ВНИМАНИЕ",
                         MessageBoxButton.OK, MessageBoxImage.Warning);
-                    return;
                 }
             });
             // Включаем кнопки считать\прошить
@@ -428,7 +426,7 @@ namespace OESProgrammer
                 _sender.Send(writefwtoRom, writefwtoRom.Length, _sendEndPoint);
 
                 var responce = _receiver.Receive(ref _receiveEndPoint);
-                if (writefwtoRom[0] != 0x0c || writefwtoRom[2] != 0x0a || writefwtoRom[3] == 0xff)
+                if (responce[0] != 0x0c || responce[2] != 0x0a || responce[3] == 0xff)
                 {
                     Dispatcher.Invoke(() =>
                     {
