@@ -27,7 +27,7 @@ namespace OESProgrammer
         private const int LocalPort = 40100;
         private const int RemotePort = 40101;
         private const uint AdrRam = 0x80008000;
-        private const uint AdrRom = 0x01440000;
+        private const uint AdrRom = 0x1400000;
         private const string FwName1 = "_7315_01_22_100_DD6_DD9_V1";
         private const string FwName2 = "_7315_01_22_100_DD6_DD9_V2";
         private const string FwName3 = "_7315_01_22_200_DD6_DD9_V3";
@@ -144,15 +144,18 @@ namespace OESProgrammer
                 SetButtonsDisable();
 
                 // Скачивание прошивки из ВПУ
-                var fw = GetFirmwareFromOed(AdrRam);
-
+                var fw = GetFirmwareFromOed(AdrRom);
+                if (fw == null) return;
                 // Проверка контрольной суммый структуры с параметрами пользователя
                 var cstrcs = CountStructControlsSum(fw);
                 var rstrcs = ReadStructCheckSum(fw);
                 if (cstrcs != rstrcs)
                 {
-                    MessageBox.Show(this, "Ошибка скачивания. Параметры повреждены.", "Ошибка",
-                        MessageBoxButton.OK, MessageBoxImage.Error);
+                    Dispatcher.Invoke(() => 
+                    {
+                        MessageBox.Show(this, "Ошибка скачивания. Параметры повреждены.", "Ошибка",
+                            MessageBoxButton.OK, MessageBoxImage.Error);
+                    });
                     return;
                 }
 
@@ -160,8 +163,11 @@ namespace OESProgrammer
                 var zerofwcs = CountFirmwareControlSum(fw, fw.Length);
                 if (zerofwcs != 0)
                 {
-                     MessageBox.Show(this, "Ошибка скачивания. Файл прошивки поврежден.", "Ошибка",
-                        MessageBoxButton.OK, MessageBoxImage.Error);
+                    Dispatcher.Invoke(() =>
+                    {
+                        MessageBox.Show(this, "Ошибка скачивания. Файл прошивки поврежден.", "Ошибка",
+                            MessageBoxButton.OK, MessageBoxImage.Error);
+                    });
                     return;
                 }
 
@@ -169,9 +175,9 @@ namespace OESProgrammer
                 DecodeFirmwareSettings(fw);
                 // Применение декодированных параметров к TextBox 
                 SetFirmwareSettings();
-                // Включение кнопок Считать\Прошить
-                SetButtonsEnable();
             });
+            // Включение кнопок Считать\Прошить
+            SetButtonsEnable();
         }
         /// <summary>
         /// Считывание текущей версии прошивки из ВПУ
@@ -204,6 +210,7 @@ namespace OESProgrammer
 
             #endregion
 
+            DoNotCloseConnectionTimer.Stop();
             try
             {
                 // Запрос на подготовку прошивки
@@ -214,12 +221,22 @@ namespace OESProgrammer
                 {
                     // Запрос на подготовку прошивки
                     _sender.Send(comGetMe2048, comGetMe2048.Length, _sendEndPoint);
+
                     for (int i = 0; i < 2; i++)
                     {
 
                         // Запрос на получение блока данных (2048)
                         var resivedData = _receiver.Receive(ref _receiveEndPoint);
 
+                        if (resivedData[0] != 0x0c || resivedData[2] != 0x03 || resivedData[3] == 0xff)
+                        {
+                            Dispatcher.Invoke(() =>
+                            {
+                                MessageBox.Show(this, "STM вернул ошибку ОЭД.", "Ошибка",
+                                    MessageBoxButton.OK, MessageBoxImage.Error);
+                            });
+                            return null;
+                        }
                         if (firmware.Length - counter >= 1024)
                         {
                             Array.Copy(resivedData, 8, firmware, counter, resivedData.Length - 8);
@@ -243,13 +260,14 @@ namespace OESProgrammer
             {
                 Dispatcher.Invoke(() =>
                 {
-                    MessageBox.Show(this, "Ошибка приема данных. Timeout.", "Ошибка", MessageBoxButton.OK,
+                    MessageBox.Show(this, "STM не ответил на команду.", "Ошибка", MessageBoxButton.OK,
                         MessageBoxImage.Error);
                 });
+                return null;
             }
             finally
             {
-
+                DoNotCloseConnectionTimer.Start();
                 // После скачивания зануляем статусбар
                 Dispatcher.Invoke(() => { PbOperationStatus.Value = 0; });
             }
@@ -336,13 +354,13 @@ namespace OESProgrammer
 
         private async void ProgrammVpd()
         {
-            await Task.Run(()=>
+            if (!GetFirmwareSettings())
+                return;
+            // Отключаем кнопки прошить\считать для избежания ошибок
+            SetButtonsDisable();
+
+            await Task.Run(() =>
             {
-                SetButtonsDisable();
-
-                if (!GetFirmwareSettings())
-                    return;
-
                 var firmware = PrepareFirmware();
                 if (firmware == null) throw new Exception("В ходе подготовки прошивки произошла ошибка.");
 
@@ -356,24 +374,81 @@ namespace OESProgrammer
                 // Сохраняем прошику перед записьшу в ВПУ
                 SaveFinishedFirmware(firmware);
 
-                if(!SendFirmWare(firmware))
+                if (!SendFirmWare(firmware))
                     return;
 
                 // Первичная верификация
                 var dwldfwRam = GetFirmwareFromOed(AdrRam);
+                if (dwldfwRam == null) return;
                 if (FirmwareVerification(firmware, dwldfwRam))
                 {
                     // Отправить команду прошить ВПУ
+                    WriteFirmwareToRom();
+
+                    // Вторичная верификация
+                    var dwldfwRom = GetFirmwareFromOed(AdrRom);
+                    if (dwldfwRom == null) return;
+                    if (FirmwareVerification(firmware, dwldfwRom))
+                        Dispatcher.Invoke(() =>
+                        {
+                            MessageBox.Show(this, "ВПУ успешно прошито.", "Информация",
+                                MessageBoxButton.OK, MessageBoxImage.Information);
+                        });
+                    else
+                    {
+                        Dispatcher.Invoke(() =>
+                        {
+                            MessageBox.Show(this, "Ошибка в ходе вторичной верификации. Не перезагружайте ВПУ!", "ВНИМАНИЕ",
+                                MessageBoxButton.OK, MessageBoxImage.Warning);
+                        });
+                        return;
+                    }
                 }
-
-                // Вторичная верификация
-                var dwldfwRom = GetFirmwareFromOed(AdrRam);
-                if (FirmwareVerification(firmware, dwldfwRom))
-                    MessageBox.Show(this, "ВПУ успешно прошито.", "Информация", MessageBoxButton.OK, MessageBoxImage.Information);
-                else MessageBox.Show(this, "Ошибка в ходе вторичной верификации. Не перезагружайте ВПУ!", "ВНИМАНИЕ", MessageBoxButton.OK, MessageBoxImage.Warning);
-
-                SetButtonsEnable();
+                else
+                {
+                    MessageBox.Show(this, "Ошибка в ходе первичной верификации.", "ВНИМАНИЕ",
+                        MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
             });
+            // Включаем кнопки считать\прошить
+            SetButtonsEnable();
+        }
+
+        private void WriteFirmwareToRom()
+        {
+            var writefwtoRom = new byte[8];
+            writefwtoRom[0] = 0x0c;
+            writefwtoRom[2] = 0x0a;
+
+            DoNotCloseConnectionTimer.Stop();
+
+            try
+            {
+                _sender.Send(writefwtoRom, writefwtoRom.Length, _sendEndPoint);
+
+                var responce = _receiver.Receive(ref _receiveEndPoint);
+                if (writefwtoRom[0] != 0x0c || writefwtoRom[2] != 0x0a || writefwtoRom[3] == 0xff)
+                {
+                    Dispatcher.Invoke(() =>
+                    {
+                        MessageBox.Show(this, "STM вернул ошибку ОЭД", "Ошибка",
+                            MessageBoxButton.OK, MessageBoxImage.Error);
+                    });
+                }
+            }
+            catch (SocketException)
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    MessageBox.Show(this, "STM не ответила на команду. Timeout.", "Ошибка",
+                        MessageBoxButton.OK, MessageBoxImage.Error);
+                });
+            }
+            finally
+            {
+                DoNotCloseConnectionTimer.Start();
+            }
         }
 
         private bool FirmwareVerification(byte[] sourcefirmware, byte[] loadedfirmware)
@@ -382,8 +457,11 @@ namespace OESProgrammer
             {
                 if (sourcefirmware[i] != loadedfirmware[i])
                 {
-                    MessageBox.Show(this, "Контрольная сумма зашитой в ВПУ прошивки не совпаадет.", "Ошибка",
-                        MessageBoxButton.OK, MessageBoxImage.Error);
+                    Dispatcher.Invoke(() =>
+                    {
+                        MessageBox.Show(this, "Контрольная сумма зашитой в ВПУ прошивки не совпаадет.", "Ошибка",
+                            MessageBoxButton.OK, MessageBoxImage.Error);
+                    });
                     return false;
                 }
             }
@@ -395,99 +473,90 @@ namespace OESProgrammer
         /// <returns>Успешно ли выполнение</returns>
         private bool GetFirmwareSettings()
         {
-            Dispatcher.Invoke(() =>
+
+            ushort deviceNumber;
+            ushort.TryParse(TbDeviceNumber.Text, out deviceNumber);
+            if (deviceNumber < 42 || deviceNumber > 65535)
             {
-                ushort deviceNumber;
-                ushort.TryParse(TbDeviceNumber.Text, out deviceNumber);
-                if (deviceNumber < 42 || deviceNumber > 65535)
-                {
-                    MessageBox.Show(this, "Номер прибора может быть от 42 до 65535", "Ошибка", MessageBoxButton.OK,
-                        MessageBoxImage.Error);
-                    return false;
-                }
-                FwConfig.Device = deviceNumber;
-
-                byte coordXChannel1;
-                var cxc1IsValid = byte.TryParse(TbCoordXChannel1.Text, out coordXChannel1);
-                if (!cxc1IsValid)
-                {
-                    MessageBox.Show(this, "Координата Х по каналу 1 может принимать значения от 0 до 255", "Ошибка",
-                        MessageBoxButton.OK, MessageBoxImage.Error);
-                    return false;
-                }
-                FwConfig.CoordXChannel1 = coordXChannel1;
-
-                byte coordYChannel1;
-                var cyc1IsValid = byte.TryParse(TbCoordYChannel1.Text, out coordYChannel1);
-                if (!cyc1IsValid)
-                {
-                    MessageBox.Show(this, "Координата Y по каналу 1 может принимать значения от 0 до 255", "Ошибка",
-                        MessageBoxButton.OK, MessageBoxImage.Error);
-                    return false;
-                }
-                FwConfig.CoordYChannel1 = coordYChannel1;
-
-                byte coordXChannel2;
-                var cxc2IsValid = byte.TryParse(TbCoordXChannel2.Text, out coordXChannel2);
-                if (!cxc2IsValid)
-                {
-                    MessageBox.Show(this, "Координата Х по каналу 2 может принимать значения от 0 до 255", "Ошибка",
-                        MessageBoxButton.OK, MessageBoxImage.Error);
-                    return false;
-                }
-                FwConfig.CoordXChannel2 = coordXChannel2;
-
-                byte coordYChannel2;
-                var cyc2IsValid = byte.TryParse(TbCoordYChannel2.Text, out coordYChannel2);
-                if (!cyc2IsValid)
-                {
-                    MessageBox.Show(this, "Координата Y по каналу 2 может принимать значения от 0 до 255", "Ошибка",
-                        MessageBoxButton.OK, MessageBoxImage.Error);
-                    return false;
-                }
-                FwConfig.CoordYChannel2 = coordYChannel2;
-
-                double focusChannel1;
-                double.TryParse(TbFocusChannel1.Text.Replace(".", ","), out focusChannel1);
-                if (focusChannel1 < 49 || focusChannel1 > 55)
-                {
-                    MessageBox.Show(this, "Фокус канала 1 может принимать значения от 49 до 55, с шагом 0,1", "Ошибка",
-                        MessageBoxButton.OK, MessageBoxImage.Error);
-                    return false;
-                }
-                FwConfig.FokusChannel1 = focusChannel1;
-
-                double focusChannel2;
-                double.TryParse(TbFocusChannel2.Text.Replace(".", ","), out focusChannel2);
-                if (focusChannel2 < 320 || focusChannel2 > 340)
-                {
-                    MessageBox.Show(this, "Фокус канала 2 может принимать значения от 320 до 340, с шагом 0,1",
-                        "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
-                    return false;
-                }
-                FwConfig.FokusChannel2 = focusChannel2;
-
-                // Проверяем выбрана ли прошивка
-                if (CbVersions.SelectedIndex == -1)
-                {
-                    MessageBox.Show(this, "Не выбрана версия прошивки.", "Ошибка", MessageBoxButton.OK,
-                        MessageBoxImage.Error);
-                    return false;
-                }
-                FwConfig.FirmwareVersion = CbVersions.SelectedIndex;
-
-                return true;
-            });
-
-            Dispatcher.Invoke(()=>
-            {
-                // Запрос у пользователя, на согласие прошить ВПУ
-                if (MessageBox.Show(this, "Вы уверены что хотите перепрошить ВПУ?", "Внимание", MessageBoxButton.YesNo,
-                        MessageBoxImage.Question) == MessageBoxResult.Yes)
-                    return true;
+                MessageBox.Show(this, "Номер прибора может быть от 42 до 65535", "Ошибка", MessageBoxButton.OK,
+                    MessageBoxImage.Error);
                 return false;
-            });
+            }
+            FwConfig.Device = deviceNumber;
 
+            byte coordXChannel1;
+            var cxc1IsValid = byte.TryParse(TbCoordXChannel1.Text, out coordXChannel1);
+            if (!cxc1IsValid)
+            {
+                MessageBox.Show(this, "Координата Х по каналу 1 может принимать значения от 0 до 255", "Ошибка",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+                return false;
+            }
+            FwConfig.CoordXChannel1 = coordXChannel1;
+
+            byte coordYChannel1;
+            var cyc1IsValid = byte.TryParse(TbCoordYChannel1.Text, out coordYChannel1);
+            if (!cyc1IsValid)
+            {
+                MessageBox.Show(this, "Координата Y по каналу 1 может принимать значения от 0 до 255", "Ошибка",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+                return false;
+            }
+            FwConfig.CoordYChannel1 = coordYChannel1;
+
+            byte coordXChannel2;
+            var cxc2IsValid = byte.TryParse(TbCoordXChannel2.Text, out coordXChannel2);
+            if (!cxc2IsValid)
+            {
+                MessageBox.Show(this, "Координата Х по каналу 2 может принимать значения от 0 до 255", "Ошибка",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+                return false;
+            }
+            FwConfig.CoordXChannel2 = coordXChannel2;
+
+            byte coordYChannel2;
+            var cyc2IsValid = byte.TryParse(TbCoordYChannel2.Text, out coordYChannel2);
+            if (!cyc2IsValid)
+            {
+                MessageBox.Show(this, "Координата Y по каналу 2 может принимать значения от 0 до 255", "Ошибка",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+                return false;
+            }
+            FwConfig.CoordYChannel2 = coordYChannel2;
+
+            double focusChannel1;
+            double.TryParse(TbFocusChannel1.Text.Replace(".", ","), out focusChannel1);
+            if (focusChannel1 < 49 || focusChannel1 > 55)
+            {
+                MessageBox.Show(this, "Фокус канала 1 может принимать значения от 49 до 55, с шагом 0,1", "Ошибка",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+                return false;
+            }
+            FwConfig.FokusChannel1 = focusChannel1;
+
+            double focusChannel2;
+            double.TryParse(TbFocusChannel2.Text.Replace(".", ","), out focusChannel2);
+            if (focusChannel2 < 320 || focusChannel2 > 340)
+            {
+                MessageBox.Show(this, "Фокус канала 2 может принимать значения от 320 до 340, с шагом 0,1",
+                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                return false;
+            }
+            FwConfig.FokusChannel2 = focusChannel2;
+
+            // Проверяем выбрана ли прошивка
+            if (CbVersions.SelectedIndex == -1)
+            {
+                MessageBox.Show(this, "Не выбрана версия прошивки.", "Ошибка", MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+                return false;
+            }
+            FwConfig.FirmwareVersion = CbVersions.SelectedIndex;
+
+            // Запрос у пользователя, на согласие прошить ВПУ
+            if (MessageBox.Show(this, "Вы уверены что хотите перепрошить ВПУ?", "Внимание", MessageBoxButton.YesNo,
+                    MessageBoxImage.Question) == MessageBoxResult.No)
+                return false;
             return true;
         }
         /// <summary>
@@ -679,7 +748,7 @@ namespace OESProgrammer
                 // 14-71 данные прошивки
                 // Устанавливаем размер прогресс бара в соответсвии с размером прошивки
                 Dispatcher.Invoke(()=> { PbOperationStatus.Maximum = firmware.Length; });
-                SetButtonsDisable();
+                DoNotCloseConnectionTimer.Stop();
                 #endregion
 
                 while (counter < firmware.Length)
@@ -693,10 +762,23 @@ namespace OESProgrammer
 
                     // Заносим 58 байт прошивки в комманду
                     int j = 14;
-                    for (int i = counter; i < counter + 58; i++)
+                    if (firmware.Length - counter >= 58)
                     {
-                        comFwUpdate[j] = firmware[i];
-                        j++;
+                        for (int i = counter; i < counter + 58; i++)
+                        {
+                            comFwUpdate[j] = firmware[i];
+                            j++;
+                        }
+                    }
+                    else
+                    {
+                        for (int i = counter; i < counter + (firmware.Length - counter); i++)
+                        {
+                            comFwUpdate[j] = firmware[i];
+                            j++;
+                        }
+                        for (int k = j; k < comFwUpdate.Length; k++)
+                            comFwUpdate[k] = 0;
                     }
 
                     _sender.Send(comFwUpdate, comFwUpdate.Length, _sendEndPoint);
@@ -720,9 +802,7 @@ namespace OESProgrammer
                     } 
                 }
                 // После окончания загрузки зануляем прогресс бар
-                PbOperationStatus.Value = 0;
-                // Включаем кнопки управления
-                SetButtonsEnable();
+                Dispatcher.Invoke(() => { PbOperationStatus.Value = 0; });
             }
             catch (SocketException)
             {
@@ -732,8 +812,11 @@ namespace OESProgrammer
                         MessageBoxButton.OK, MessageBoxImage.Error);
                 });
                 return false;
+            }finally
+            {
+                DoNotCloseConnectionTimer.Start();
             }
-            return true;
+         return true;
         }
 
     }
