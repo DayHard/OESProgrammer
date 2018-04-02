@@ -446,6 +446,8 @@ namespace OESProgrammer
             finally
             {
                 DoNotCloseConnectionTimer.Start();
+                // Дает время на прошивку ОЭД
+                Thread.Sleep(2000);
             }
         }
 

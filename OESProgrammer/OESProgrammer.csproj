@@ -126,8 +126,5 @@
     <Resource Include="Resources\Flag_of_Russia.png" />
     <Resource Include="Resources\Properties.png" />
   </ItemGroup>
-  <ItemGroup>
-    <None Include="Resources\NumericUpDown.dll" />
-  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
