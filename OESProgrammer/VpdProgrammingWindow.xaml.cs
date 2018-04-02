@@ -361,6 +361,7 @@ namespace OESProgrammer
 
             await Task.Run(() =>
             {
+                Dispatcher.Invoke(() => { GbOperationStatus.Header = "Статус операции: Этап 1 из 3"; });
                 var firmware = PrepareFirmware();
                 if (firmware == null) throw new Exception("В ходе подготовки прошивки произошла ошибка.");
 
@@ -378,6 +379,7 @@ namespace OESProgrammer
                     return;
 
                 // Первичная верификация
+                Dispatcher.Invoke(() => { GbOperationStatus.Header = "Статус операции: Этап 2 из 3"; });
                 var dwldfwRam = GetFirmwareFromOed(AdrRam);
                 if (dwldfwRam == null) return;
                 if (FirmwareVerification(firmware, dwldfwRam))
@@ -386,6 +388,7 @@ namespace OESProgrammer
                     WriteFirmwareToRom();
 
                     // Вторичная верификация
+                    Dispatcher.Invoke(() => { GbOperationStatus.Header = "Статус операции: Этап 3 из 3"; });
                     var dwldfwRom = GetFirmwareFromOed(AdrRom);
                     if (dwldfwRom == null) return;
                     if (FirmwareVerification(firmware, dwldfwRom))
@@ -409,6 +412,7 @@ namespace OESProgrammer
                         MessageBoxButton.OK, MessageBoxImage.Warning);
                 }
             });
+            Dispatcher.Invoke(() => { GbOperationStatus.Header = "Статус операции"; });
             // Включаем кнопки считать\прошить
             SetButtonsEnable();
         }
