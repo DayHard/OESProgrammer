@@ -37,8 +37,7 @@
     </Win32Resource>
   </PropertyGroup>
   <PropertyGroup>
-    <ApplicationIcon>
-    </ApplicationIcon>
+    <ApplicationIcon>BiohazardGreen.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
@@ -125,6 +124,9 @@
     <Resource Include="Resources\Flag_of_France.png" />
     <Resource Include="Resources\Flag_of_Russia.png" />
     <Resource Include="Resources\Properties.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="BiohazardGreen.ico" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

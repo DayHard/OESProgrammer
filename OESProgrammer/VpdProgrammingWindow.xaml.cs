@@ -721,7 +721,8 @@ namespace OESProgrammer
         private static void SaveFinishedFirmware(byte[] firmware)
         {
             var version = FwConfig.FirmwareVersion + 1;
-            using (var bin = new BinaryWriter(File.OpenWrite("Номер прибора " + FwConfig.Device + " Версия прошивки " + version + ".bex")))
+            using (var bin = new BinaryWriter(File.OpenWrite(
+                "[" + DateTime.Now + "]" + " Номер прибора " + FwConfig.Device + " Версия прошивки " + version + ".bex")))
             {
                 bin.Write(firmware);
             }
@@ -822,7 +823,12 @@ namespace OESProgrammer
             }
          return true;
         }
-
+        // Разблокировка кнопки прошить, при выборе версии прошивки
+        private void CbVersions_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+        {
+            if (CbVersions.SelectedIndex != -1)
+                BtnProgrammVpd.IsEnabled = true;
+        }
     }
     // Хранятся значения полей, введенных пользователем
     public static class FwConfig

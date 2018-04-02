@@ -8,23 +8,23 @@
     <Grid HorizontalAlignment="Left" Width="272">
         <Button x:Name="BtnProgrammingVpd" Content="Программирование&#xD;&#xA;       платы ВПУ" HorizontalAlignment="Left" Margin="10,40,0,0" VerticalAlignment="Top" Width="120" Height="65" Click="BtnProgrammingVpd_Click"/>
         <Button x:Name="BtnProgrammingCap" Content="Программирование&#xD;&#xA;         крышки" HorizontalAlignment="Left" Margin="145,40,0,10" VerticalAlignment="Top" Width="120" Height="65" Click="BtnProgrammingCap_Click" />
-        <Button x:Name="BtnLangRus" Content="&#xD;&#xA;" HorizontalAlignment="Left" Margin="10,8,0,0" VerticalAlignment="Top" Width="30" Height="20" Click="BtnLangRus_Click">
+        <Button x:Name="BtnLangRus" Content="&#xD;&#xA;" HorizontalAlignment="Left" Margin="10,8,0,0" VerticalAlignment="Top" Width="30" Height="20" Click="BtnLangRus_Click" Visibility="Hidden">
             <Button.Background>
                 <ImageBrush ImageSource="Resources/Flag_of_Russia.png" />
             </Button.Background>
         </Button>
-        <Button x:Name="BtnLangFr" Content="" HorizontalAlignment="Left" Margin="45,8,0,0" VerticalAlignment="Top" Width="30" Height="20" Click="BtnLangFr_Click">
+        <Button x:Name="BtnLangFr" Content="" HorizontalAlignment="Left" Margin="45,8,0,0" VerticalAlignment="Top" Width="30" Height="20" Click="BtnLangFr_Click" Visibility="Hidden">
             <Button.Background>
                 <ImageBrush ImageSource="Resources/Flag_of_France.png"/>
             </Button.Background>
         </Button>
-        <Button x:Name="BtnLangEng" Content="" HorizontalAlignment="Left" Margin="80,8,0,0" VerticalAlignment="Top" Width="30" Height="20" Click="BtnLangEng_Click">
+        <Button x:Name="BtnLangEng" Content="" HorizontalAlignment="Left" Margin="80,8,0,0" VerticalAlignment="Top" Width="30" Height="20" Click="BtnLangEng_Click" Visibility="Hidden">
             <Button.Background>
                 <ImageBrush ImageSource="Resources/Flag_of_Britain.jpg"/>
             </Button.Background>
         </Button>
         <Label x:Name="LbVersion" Content="Версия ПО: 0.0.0.0" HorizontalAlignment="Left" Margin="10,110,0,0" VerticalAlignment="Top"/>
-        <Button x:Name="BtnProp"  HorizontalAlignment="Left" Margin="235,8,0,0" VerticalAlignment="Top" Width="30" Height="25">
+        <Button x:Name="BtnProp"  HorizontalAlignment="Left" Margin="235,8,0,0" VerticalAlignment="Top" Width="30" Height="25" Visibility="Hidden">
             <Button.Background>
                 <ImageBrush ImageSource="Resources/Properties.png"/>
             </Button.Background>
